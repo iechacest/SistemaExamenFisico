@@ -420,7 +420,7 @@ if ($algunMenor51 || $promedio < 51) {
     //   GENERAR Y GUARDAR EL PDF
     // ===============================
     $mpdf = new \Mpdf\Mpdf([
-        'tempDir' => 'C:/mpdf_temp'
+        'tempDir' => '/var/www/html/tmp/mpdf'
     ]);
 
     // Pasamos TODOS los datos incluyendo el evaluador
