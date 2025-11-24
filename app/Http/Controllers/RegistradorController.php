@@ -564,5 +564,105 @@ public function cambiarPassword(Request $request)
 
     return back()->with('success', 'Tu contraseña fue actualizada correctamente.');
 }
+public function editar($id_prueba)
+    {
+        $prueba = Prueba::findOrFail($id_prueba);
+        $postulante = $prueba->postulante;
+        $evaluacion = $prueba->evaluacion;
+
+        return view('registrador_editar_postulante', compact(
+            'prueba',
+            'postulante',
+            'evaluacion'
+        ));
+    }
+public function actualizar(Request $request, $id_prueba)
+    {
+        $prueba = Prueba::findOrFail($id_prueba);
+        $postulante = $prueba->postulante;
+        $evaluacion = $prueba->evaluacion;
+
+        // === Reglas de validación ===
+        $request->validate([
+            'velocidad' => 'required',
+            'prueba_resis' => 'required',
+            'barra' => 'required|numeric',
+            'natacion' => 'required',
+            'cap_abdominal' => 'required|numeric',
+            'flexiones' => 'required|numeric',
+            'observacion' => 'nullable|string|max:400',
+        ]);
+
+        // === Usamos los métodos del RegistradorController ===
+        $calc = app(RegistradorController::class);
+
+        $ti_vel  = $calc->normalizarTiempo($request->velocidad);
+        $ti_res  = $calc->normalizarTiempo($request->prueba_resis);
+        $ti_nat  = $calc->normalizarTiempo($request->natacion);
+
+        $notaVel = $calc->calcularPuntajeVelocidad($postulante->sexo, $ti_vel);
+        $notaRes = $calc->calcularPuntajeResistencia($postulante->sexo, $ti_res);
+        $notaBar = $calc->calcularPuntajeBarra($postulante->sexo, $request->barra);
+        $notaNat = $calc->calcularPuntajeNatacion($postulante->sexo, $ti_nat);
+        $notaAbd = $calc->calcularPuntajeAbdominales($postulante->sexo, $request->cap_abdominal);
+        $notaFlex= $calc->calcularPuntajeFlexiones($postulante->sexo, $request->flexiones);
+
+        // =============================
+        //   ACTUALIZAR LA EVALUACIÓN
+        // =============================
+        $evaluacion->update([
+            'velocidad' => $ti_vel,
+            'nota_velocidad' => $notaVel,
+
+            'prueba_resis' => $ti_res,
+            'nota_prueba' => $notaRes,
+
+            'barra' => $request->barra,
+            'nota_barra' => $notaBar,
+
+            'natacion' => $ti_nat,
+            'nota_natacion' => $notaNat,
+
+            'cap_abdominal' => $request->cap_abdominal,
+            'nota_cap' => $notaAbd,
+
+            'flexiones' => $request->flexiones,
+            'nota_flexiones' => $notaFlex,
+        ]);
+
+        // Nota total
+        $prom = ($notaVel + $notaRes + $notaBar + $notaNat + $notaAbd + $notaFlex) / 6;
+        $prueba->nota_total = $prom;
+        $prueba->conclusion = $prom >= 51 ? 'APROBADO' : 'REPROBADO';
+        $prueba->observacion = $request->observacion;
+        $prueba->save();
+
+        // ======================================================
+        // ======================================================
+        $evaluador = Usuario::find(session('id_usu'));
+
+        $mpdf = new Mpdf([
+            'tempDir' => 'C:/mpdf_temp'
+        ]);
+
+        $html = view('pdf_evaluacion', compact(
+            'postulante',
+            'prueba',
+            'evaluacion',
+            'evaluador'
+        ))->render();
+
+        $mpdf->WriteHTML($html);
+
+        $pdfName = 'evaluacion_postulante_' . $postulante->id_postulante . '_' . time() . '.pdf';
+        $savePath = storage_path('app/pdfs/' . $pdfName);
+
+        $mpdf->Output($savePath, \Mpdf\Output\Destination::FILE);
+
+        $prueba->ruta_pdf = 'pdfs/' . $pdfName;
+        $prueba->save();
+
+        return redirect()->route('dash.registrador')->with('success', 'Evaluación actualizada correctamente.');
+    }
 
 }

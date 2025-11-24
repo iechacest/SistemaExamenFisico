@@ -246,7 +246,7 @@
             <div class="msg-success">{{ session('success') }}</div>
         @endif
 
-        <form method="POST" action="{{ route('admin.evaluacion.actualizar', $prueba->id_prueba) }}">
+<form method="POST" action="{{ route('postulante.actualizar', $prueba->id_prueba) }}">
             @csrf
 
             <!-- === IDENTIFICACIÓN === -->
@@ -427,12 +427,11 @@
             </div>
 
             <div class="acciones">
-                <a href="{{ route('dash.admin') }}" class="btn btn-secondary">Volver</a>
+                <a href="{{ route('dash.registrador') }}" class="btn btn-secondary">Volver</a>
                 <button class="btn btn-primary">Guardar cambios y regenerar PDF</button>
             </div>
 
         </div>
-
         </form>
 
 </div>

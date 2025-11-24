@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegistradorController;
+use App\Http\Middleware\RegistradorMiddleware;
 use App\Http\Controllers\AdminController;
 use App\Http\Middleware\AdminMiddleware;
 
@@ -93,3 +94,14 @@ Route::post('/admin/usuarios/{id}/actualizar', [AdminController::class, 'actuali
 Route::delete('/admin/usuarios/{id}/eliminar', [AdminController::class, 'eliminarUsuario'])
     ->middleware(AdminMiddleware::class)
     ->name('admin.usuarios.eliminar');
+
+// EDITAR POSTULANTE (registrador)
+// === EDITAR POSTULANTE (registrador) ===
+Route::get('/pruebas/{id_prueba}/editar', 
+    [RegistradorController::class, 'editar'])
+    ->name('postulante.editar');
+
+Route::post('/postulantes/{id_prueba}/actualizar', 
+    [RegistradorController::class, 'actualizar'])
+    ->middleware(RegistradorMiddleware::class)
+    ->name('postulante.actualizar');

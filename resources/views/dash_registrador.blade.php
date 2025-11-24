@@ -486,6 +486,13 @@
                    style="padding: 0.25rem 0.8rem; font-size: 0.78rem;">
                     Descargar
                 </a>
+
+                <a href="{{ route('postulante.editar', $ultima->id_prueba) }}"
+   class="btn btn-secondary"
+   style="padding:0.25rem 0.7rem; font-size:0.78rem;">
+    Editar
+</a>
+
             @else
                 <span style="font-size: 0.75rem; color: #777;">Sin PDF</span>
             @endif
