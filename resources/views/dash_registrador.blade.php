@@ -376,6 +376,7 @@
         </form>
     </section>
 
+
     {{-- Dos columnas: No atendidos / Atendidos --}}
     <main>
         {{-- Postulantes NO atendidos --}}
@@ -418,10 +419,35 @@
                     <td>{{ $p->nombres }}</td>
                     <td><span class="badge-inst">{{ $inst }}</span></td>
                     <td>
-                        <a href="{{ route('postulante.form', $p->id_postulante) }}" class="btn btn-primary" style="padding: 0.25rem 0.8rem; font-size: 0.8rem;">
-                            Llenar
-                        </a>
-                    </td>
+
+@php
+    // última evaluación del postulante (si existe)
+    $eva = $p->evaluacion;
+@endphp
+@if(!$eva)
+    <button onclick="abrirVelocidad({{ $p->id_postulante }})" class="btn btn-primary">Velocidad</button>
+
+@elseif(is_null($eva->prueba_resis))
+    <button onclick="abrirResistencia({{ $p->id_postulante }})" class="btn btn-primary">Resistencia</button>
+
+@elseif(is_null($eva->barra))
+    <button onclick="abrirBarra({{ $p->id_postulante }})" class="btn btn-primary">Barra</button>
+
+@elseif(is_null($eva->natacion))
+    <button onclick="abrirNatacion({{ $p->id_postulante }})" class="btn btn-primary">Natación</button>
+
+@elseif(is_null($eva->cap_abdominal))
+    <button onclick="abrirAbdominal({{ $p->id_postulante }})" class="btn btn-primary">Abdominales</button>
+
+@elseif(is_null($eva->flexiones))
+    <button onclick="abrirFlexiones({{ $p->id_postulante }})" class="btn btn-primary">Flexiones</button>
+
+@else
+    <span>Completado</span>
+@endif
+
+</td>
+
                 </tr>
             @endforeach
             </tbody>
@@ -507,6 +533,431 @@
     </main>
 
 </div>
+<div id="modalVelocidad" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9999;">
+    
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:330px;">
+        <h3 style="margin-bottom:1rem;">Registrar Velocidad</h3>
+
+        <form id="formVelocidad" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">Tiempo</label>
+            <input type="text" name="velocidad" 
+                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                          border:1px solid #ccc; border-radius:7px;" required>
+
+            <button type="submit"
+                    class="btn btn-primary"
+                    style="margin-top:1rem; width:100%;">
+                Guardar
+            </button>
+        </form>
+
+        <button onclick="cerrarVelocidad()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">
+            Cancelar
+        </button>
+    </div>
+</div>
+{{-- ===== MODAL RESISTENCIA ===== --}}
+<div id="modalResistencia" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9999;">
+
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
+        <h3 style="margin-bottom:1rem;">Registrar Resistencia</h3>
+
+        <p><b>Velocidad:</b> <span id="res_velocidad"></span></p>
+        <p><b>Nota velocidad:</b> <span id="res_nota_velocidad"></span></p>
+
+        <form id="formResistencia" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">Tiempo</label>
+            <input type="text" name="prueba_resis"
+                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                          border:1px solid #ccc; border-radius:7px;" required>
+
+            <button type="submit"
+                    class="btn btn-primary"
+                    style="margin-top:1rem; width:100%;">
+                Guardar
+            </button>
+        </form>
+
+        <button onclick="cerrarResistencia()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">
+            Cancelar
+        </button>
+    </div>
+</div>
+
+
+{{-- ===== MODAL BARRA ===== --}}
+<div id="modalBarra" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9999;">
+
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
+        <h3 style="margin-bottom:1rem;">Registrar Barra (sin tiempo)</h3>
+
+        <p><b>Velocidad:</b> <span id="bar_velocidad"></span></p>
+        <p><b>Nota velocidad:</b> <span id="bar_nota_velocidad"></span></p>
+
+        <p><b>Resistencia:</b> <span id="bar_res"></span></p>
+        <p><b>Nota resistencia:</b> <span id="bar_nota_res"></span></p>
+
+        <form id="formBarra" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">N° Repeticiones</label>
+            <input type="number" name="barra"
+                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                          border:1px solid #ccc; border-radius:7px;" required>
+
+            <button type="submit"
+                    class="btn btn-primary"
+                    style="margin-top:1rem; width:100%;">
+                Guardar
+            </button>
+        </form>
+
+        <button onclick="cerrarBarra()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">
+            Cancelar
+        </button>
+    </div>
+</div>
+
+{{-- ===== MODAL ABDOMINALES ===== --}}
+<div id="modalAbdominal" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9999;">
+
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
+        <h3 style="margin-bottom:1rem;">Registrar Abdominales</h3>
+
+        <p><b>Velocidad:</b> <span id="abd_velocidad"></span></p>
+        <p><b>Nota velocidad:</b> <span id="abd_nota_velocidad"></span></p>
+
+        <p><b>Resistencia:</b> <span id="abd_res"></span></p>
+        <p><b>Nota resistencia:</b> <span id="abd_nota_res"></span></p>
+
+        <p><b>Barra:</b> <span id="abd_barra"></span></p>
+        <p><b>Nota barra:</b> <span id="abd_nota_barra"></span></p>
+
+        <p><b>Natación:</b> <span id="abd_nat"></span></p>
+        <p><b>Nota natación:</b> <span id="abd_nota_nat"></span></p>
+
+        <form id="formAbdominal" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">N° Repeticiones</label>
+            <input type="number" name="cap_abdominal"
+                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                          border:1px solid #ccc; border-radius:7px;" required>
+
+            <button type="submit"
+                    class="btn btn-primary"
+                    style="margin-top:1rem; width:100%;">
+                Guardar
+            </button>
+        </form>
+
+        <button onclick="cerrarAbdominal()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">
+            Cancelar
+        </button>
+    </div>
+</div>
+
+
+{{-- ===== MODAL NATACIÓN ===== --}}
+<div id="modalNatacion" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9999;">
+
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
+        <h3 style="margin-bottom:1rem;">Registrar Natación</h3>
+
+        <p><b>Velocidad:</b> <span id="nat_velocidad"></span></p>
+        <p><b>Nota velocidad:</b> <span id="nat_nota_velocidad"></span></p>
+
+        <p><b>Resistencia:</b> <span id="nat_res"></span></p>
+        <p><b>Nota resistencia:</b> <span id="nat_nota_res"></span></p>
+
+        <p><b>Barra:</b> <span id="nat_barra"></span></p>
+        <p><b>Nota barra:</b> <span id="nat_nota_barra"></span></p>
+
+        <form id="formNatacion" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">Distancia (metros)</label>
+            <input type="text" name="natacion"
+                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                          border:1px solid #ccc; border-radius:7px;" required>
+
+            <button type="submit"
+                    class="btn btn-primary"
+                    style="margin-top:1rem; width:100%;">
+                Guardar
+            </button>
+        </form>
+
+        <button onclick="cerrarNatacion()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">
+            Cancelar
+        </button>
+    </div>
+</div>
+{{-- ===== MODAL FLEXIONES ===== --}}
+<div id="modalFlexiones" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9999;">
+    
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:360px;">
+        <h3 style="margin-bottom:1rem;">Registrar Flexiones</h3>
+
+        <p><b>Velocidad:</b> <span id="flex_velocidad"></span></p>
+        <p><b>Nota velocidad:</b> <span id="flex_nota_velocidad"></span></p>
+
+        <p><b>Resistencia:</b> <span id="flex_res"></span></p>
+        <p><b>Nota resistencia:</b> <span id="flex_nota_res"></span></p>
+
+        <p><b>Barra:</b> <span id="flex_barra"></span></p>
+        <p><b>Nota barra:</b> <span id="flex_nota_barra"></span></p>
+
+        <p><b>Natación:</b> <span id="flex_nat"></span></p>
+        <p><b>Nota natación:</b> <span id="flex_nota_nat"></span></p>
+
+        <p><b>Abdominales:</b> <span id="flex_abd"></span></p>
+        <p><b>Nota abdominales:</b> <span id="flex_nota_abd"></span></p>
+
+        <form id="formFlexiones" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">N° Repeticiones</label>
+            <input type="number" name="flexiones"
+                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                          border:1px solid #ccc; border-radius:7px;" required>
+
+            <button type="submit" class="btn btn-primary" 
+                    style="margin-top:1rem; width:100%;">Guardar</button>
+        </form>
+
+        <button onclick="cerrarFlexiones()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">Cancelar</button>
+    </div>
+</div>
+{{-- ===== MODAL FINAL ===== --}}
+<div id="modalFinal" 
+     style="display:none; position:fixed; inset:0; background:#0009;
+            justify-content:center; align-items:center; z-index:99999;">
+    
+    <div style="background:white; padding:1.5rem; border-radius:12px; width:380px;">
+        <h3 style="margin-bottom:1rem;">Resultados Finales</h3>
+
+        <p><b>Promedio Total:</b> <span id="final_promedio"></span></p>
+        <p><b>Conclusión:</b> <span id="final_conclusion"></span></p>
+
+        <form id="formFinal" method="POST" action="">
+            @csrf
+
+            <label style="font-size:0.85rem;">Observación</label>
+            <textarea name="observacion" rows="3"
+                      style="width:100%; margin-top:0.3rem; padding:0.5rem;
+                             border:1px solid #ccc; border-radius:7px;" required></textarea>
+
+            <button type="submit" class="btn btn-primary"
+                    style="margin-top:1rem; width:100%;">Guardar Evaluación</button>
+        </form>
+
+        <button onclick="cerrarFinal()"
+                class="btn btn-secondary"
+                style="margin-top:0.7rem; width:100%;">Cancelar</button>
+    </div>
+</div>
+
+@if(session('final_id'))
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    abrirFinal(
+        "{{ session('final_id') }}",
+        "{{ session('final_promedio') }}",
+        "{{ session('final_conclusion') }}"
+    );
+});
+</script>
+@endif
+
 
 </body>
 </html>
+<script>
+function abrirVelocidad(id) {
+    document.getElementById("modalVelocidad").style.display = "flex";
+    document.getElementById("formVelocidad").action = "/postulantes/" + id + "/velocidad";
+}
+
+function cerrarVelocidad() {
+    document.getElementById("modalVelocidad").style.display = "none";
+}
+</script>
+<script>
+
+function abrirVelocidad(id){
+    document.getElementById("modalVelocidad").style.display="flex";
+    document.getElementById("formVelocidad").action="/postulantes/"+id+"/velocidad";
+}
+
+function cerrarVelocidad(){
+    document.getElementById("modalVelocidad").style.display="none";
+}
+
+
+
+// ===== RESISTENCIA =====
+function abrirResistencia(id){
+
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById("res_velocidad").innerText = data.velocidad;
+            document.getElementById("res_nota_velocidad").innerText = data.nota_velocidad;
+        });
+
+    document.getElementById("modalResistencia").style.display="flex";
+    document.getElementById("formResistencia").action = "/postulantes/"+id+"/resistencia";
+}
+
+function cerrarResistencia(){
+    document.getElementById("modalResistencia").style.display="none";
+}
+
+
+
+// ===== BARRA =====
+function abrirBarra(id){
+
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById("bar_velocidad").innerText = data.velocidad;
+            document.getElementById("bar_nota_velocidad").innerText = data.nota_velocidad;
+
+            document.getElementById("bar_res").innerText = data.prueba_resis;
+            document.getElementById("bar_nota_res").innerText = data.nota_prueba;
+        });
+
+    document.getElementById("modalBarra").style.display="flex";
+    document.getElementById("formBarra").action = "/postulantes/"+id+"/barra";
+}
+
+function cerrarBarra(){
+    document.getElementById("modalBarra").style.display="none";
+}
+function abrirAbdominal(id){
+
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+
+            document.getElementById("abd_velocidad").innerText = data.velocidad;
+            document.getElementById("abd_nota_velocidad").innerText = data.nota_velocidad;
+
+            document.getElementById("abd_res").innerText = data.prueba_resis;
+            document.getElementById("abd_nota_res").innerText = data.nota_prueba;
+
+            document.getElementById("abd_barra").innerText = data.barra;
+            document.getElementById("abd_nota_barra").innerText = data.nota_barra;
+
+            document.getElementById("abd_nat").innerText = data.natacion;
+            document.getElementById("abd_nota_nat").innerText = data.nota_natacion;
+        });
+
+    document.getElementById("modalAbdominal").style.display = "flex";
+    document.getElementById("formAbdominal").action = "/postulantes/" + id + "/abdominal";
+}
+
+function cerrarAbdominal(){
+    document.getElementById("modalAbdominal").style.display = "none";
+}
+
+function abrirFlexiones(id){
+
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+
+            document.getElementById("flex_velocidad").innerText = data.velocidad;
+            document.getElementById("flex_nota_velocidad").innerText = data.nota_velocidad;
+
+            document.getElementById("flex_res").innerText = data.prueba_resis;
+            document.getElementById("flex_nota_res").innerText = data.nota_prueba;
+
+            document.getElementById("flex_barra").innerText = data.barra;
+            document.getElementById("flex_nota_barra").innerText = data.nota_barra;
+
+            document.getElementById("flex_nat").innerText = data.natacion;
+            document.getElementById("flex_nota_nat").innerText = data.nota_natacion;
+
+            document.getElementById("flex_abd").innerText = data.cap_abdominal;
+            document.getElementById("flex_nota_abd").innerText = data.nota_cap;
+        });
+
+    document.getElementById("modalFlexiones").style.display = "flex";
+    document.getElementById("formFlexiones").action = "/postulantes/" + id + "/flexiones";
+}
+
+function cerrarFlexiones(){
+    document.getElementById("modalFlexiones").style.display = "none";
+}
+
+
+
+// ===== NATACION =====
+function abrirNatacion(id){
+
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById("nat_velocidad").innerText = data.velocidad;
+            document.getElementById("nat_nota_velocidad").innerText = data.nota_velocidad;
+
+            document.getElementById("nat_res").innerText = data.prueba_resis;
+            document.getElementById("nat_nota_res").innerText = data.nota_prueba;
+
+            document.getElementById("nat_barra").innerText = data.barra;
+            document.getElementById("nat_nota_barra").innerText = data.nota_barra;
+        });
+
+    document.getElementById("modalNatacion").style.display = "flex";
+    document.getElementById("formNatacion").action = "/postulantes/" + id + "/natacion";
+}
+
+function cerrarNatacion(){
+    document.getElementById("modalNatacion").style.display = "none";
+}
+
+function abrirFinal(id, promedio, conclusion){
+    document.getElementById("final_promedio").innerText = promedio;
+    document.getElementById("final_conclusion").innerText = conclusion;
+
+    document.getElementById("modalFinal").style.display = "flex";
+    document.getElementById("formFinal").action = "/postulantes/" + id + "/finalizar";
+}
+
+
+function cerrarFinal(){
+    document.getElementById("modalFinal").style.display = "none";
+}
+
+</script>

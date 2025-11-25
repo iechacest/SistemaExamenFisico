@@ -26,8 +26,11 @@ class Evaluacion extends Model
         'id_prueba',
     ];
 
+
     public function prueba()
-    {
-        return $this->belongsTo(Prueba::class, 'id_prueba', 'id_prueba');
-    }
+{
+    return $this->belongsTo(Prueba::class, 'id_prueba', 'id_prueba');
+}
+
+
 }

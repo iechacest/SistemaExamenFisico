@@ -105,3 +105,70 @@ Route::post('/postulantes/{id_prueba}/actualizar',
     [RegistradorController::class, 'actualizar'])
     ->middleware(RegistradorMiddleware::class)
     ->name('postulante.actualizar');
+// Formulario para llenar velocidad a varios postulantes
+Route::get('/evaluacion/velocidad', [RegistradorController::class, 'formVelocidad'])
+     ->name('evaluacion.velocidad');
+
+// GUARDAR RESISTENCIA
+Route::post('/postulantes/{id}/resistencia', 
+    [RegistradorController::class, 'guardarResistencia'])
+    ->name('postulante.resistencia');
+
+// GUARDAR BARRA
+Route::post('/postulantes/{id}/barra', 
+    [RegistradorController::class, 'guardarBarra'])
+    ->name('postulante.barra');
+
+// GUARDAR ABDOMINALES
+Route::post('/postulantes/{id}/abdominal', 
+    [RegistradorController::class, 'guardarAbdominal'])
+    ->name('postulante.abdominal');
+
+// GUARDAR FLEXIONES
+Route::post('/postulantes/{id}/flexiones', 
+    [RegistradorController::class, 'guardarFlexiones'])
+    ->name('postulante.flexiones');
+
+// GUARDAR NATACIÓN
+Route::post('/postulantes/{id}/natacion', 
+    [RegistradorController::class, 'guardarNatacion'])
+    ->name('postulante.natacion');
+
+    Route::get('/api/evaluacion/{postulante}', function ($id) {
+
+    $prueba = \App\Models\Prueba::where('id_postulante', $id)
+        ->latest('id_prueba')
+        ->first();
+
+    if (!$prueba) {
+        return response()->json([]);
+    }
+
+    $eva = \App\Models\Evaluacion::where('id_prueba', $prueba->id_prueba)->first();
+
+    return response()->json($eva);
+});
+
+Route::post('/postulantes/{id_postulante}/barra', 
+    [RegistradorController::class, 'guardarBarra']);
+
+// Natación
+Route::post('/postulantes/{id_postulante}/natacion', 
+    [RegistradorController::class, 'guardarNatacion'])
+    ->name('postulante.natacion');
+
+    Route::post('/postulantes/{id_postulante}/abdominal', 
+    [RegistradorController::class, 'guardarAbdominal'])
+    ->name('postulante.abdominal');
+
+    Route::post('/postulantes/{id}/flexiones', [RegistradorController::class, 'guardarFlexiones'])->name('flexiones.guardar');
+
+Route::post('/postulantes/{id}/finalizar', [RegistradorController::class, 'finalizarEvaluacion'])->name('evaluacion.finalizar');
+Route::post('/postulantes/{id}/finalizar',
+    [RegistradorController::class, 'finalizarEvaluacion']
+)->name('evaluacion.finalizar');
+
+// GUARDAR VELOCIDAD
+Route::post('/postulantes/{id}/velocidad', 
+    [RegistradorController::class, 'guardarVelocidad'])
+    ->name('postulante.velocidad');

@@ -40,5 +40,18 @@ class Postulante extends Model
 {
     return $this->hasOne(Prueba::class, 'id_postulante')->latestOfMany();
 }
+public function evaluacion()
+{
+    return $this->hasOneThrough(
+        \App\Models\Evaluacion::class,
+        \App\Models\Prueba::class,
+        'id_postulante',   // clave en prueba hacia postulante
+        'id_prueba',       // clave en evaluacion hacia prueba
+        'id_postulante',   // clave local en postulante
+        'id_prueba'        // clave local en prueba
+    );
+}
+
+
 
 }

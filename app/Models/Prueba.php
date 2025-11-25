@@ -26,5 +26,6 @@ class Prueba extends Model
     {
         return $this->hasOne(Evaluacion::class, 'id_prueba', 'id_prueba');
     }
+    
 
 }
