@@ -991,7 +991,7 @@ public function finalizarEvaluacion(Request $request, $id_postulante)
     //   GENERAR Y GUARDAR EL PDF
     // ===============================
     $mpdf = new \Mpdf\Mpdf([
-        'tempDir' => storage_path('app/mpdf_temp')
+        'tempDir' => '/var/www/html/tmp/mpdf'
     ]);
 
     $html = view('pdf_evaluacion', [
