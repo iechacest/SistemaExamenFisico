@@ -140,7 +140,7 @@ class AdminController extends Controller
         $evaluador = Usuario::find(session('id_usu'));
 
         $mpdf = new Mpdf([
-            'tempDir' => 'C:/mpdf_temp'
+            'tempDir' => '/var/www/html/tmp/mpdf'
         ]);
 
         $html = view('pdf_evaluacion', compact(

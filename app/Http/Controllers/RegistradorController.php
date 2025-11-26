@@ -715,11 +715,7 @@ public function obtenerIdPrueba($id_postulante)
         }
 
         // Determinar la conclusión
-        if (min($notas_validas) < 51) {
-            $conclusion = 'Reprobado';
-        } else {
-            $conclusion = 'Aprobado';
-        }
+        $conclusion = $promedio >= 51 ? 'APROBADO' : 'REPROBADO';
     }
 
     return response()->json([

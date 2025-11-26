@@ -885,7 +885,7 @@ function calcularPromedio() {
     const algunMenor51 = notas.some(nota => nota < 51);
 
     // Determinamos si es aprobado o reprobado
-    const conclusion = (algunMenor51 || promedio < 51) ? 'REPROBADO' : 'APROBADO';
+    const conclusion = promedio < 51 ? 'REPROBADO' : 'APROBADO';
 
     document.getElementById('promedio').value = conclusion;
 }

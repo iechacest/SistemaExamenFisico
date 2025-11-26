@@ -817,12 +817,9 @@ function calcularPromedio() {
     // Conclusión final
     let conclusion;
 
-    if (existeNotaBaja) {
-        conclusion = 'REPROBADO';
-    } else {
+    
         // Si no hay notas menores a 51, evaluamos el promedio
         conclusion = promedio >= 51 ? 'APROBADO' : 'REPROBADO';
-    }
 
     document.getElementById('promedio').value = conclusion;
 }
