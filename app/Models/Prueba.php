@@ -24,8 +24,6 @@ class Prueba extends Model
 
     public function evaluacion()
     {
-        return $this->hasOne(Evaluacion::class, 'id_prueba', 'id_prueba');
+        return $this->hasOne(Evaluacion::class, 'id_prueba');
     }
-    
-
 }

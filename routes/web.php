@@ -161,14 +161,16 @@ Route::post('/postulantes/{id_postulante}/natacion',
     [RegistradorController::class, 'guardarAbdominal'])
     ->name('postulante.abdominal');
 
-    Route::post('/postulantes/{id}/flexiones', [RegistradorController::class, 'guardarFlexiones'])->name('flexiones.guardar');
-
-Route::post('/postulantes/{id}/finalizar', [RegistradorController::class, 'finalizarEvaluacion'])->name('evaluacion.finalizar');
-Route::post('/postulantes/{id}/finalizar',
-    [RegistradorController::class, 'finalizarEvaluacion']
-)->name('evaluacion.finalizar');
+    Route::post('/postulantes/{id}/flexiones', [RegistradorController::class, 'guardarFlexiones'])->name('flexiones.guardar');;
 
 // GUARDAR VELOCIDAD
 Route::post('/postulantes/{id}/velocidad', 
     [RegistradorController::class, 'guardarVelocidad'])
     ->name('postulante.velocidad');
+
+Route::get('/obtener-id-prueba/{id_postulante}', [RegistradorController::class, 'obtenerIdPrueba']);
+Route::post('/actualizar-prueba/{id_postulante}', [RegistradorController::class, 'actualizarPrueba']);
+Route::get('/generar-pdf/{id_postulante}', [RegistradorController::class, 'generarPDF']);
+Route::get('/filtrar-postulantes', [RegistradorController::class, 'filtrarPostulantes']);
+
+

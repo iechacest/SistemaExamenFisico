@@ -35,6 +35,12 @@ class Postulante extends Model
     {
         return $this->hasMany(Prueba::class, 'id_postulante', 'id_postulante');
     }
+    // En el modelo Postulante.php
+public function prueba()
+{
+    return $this->hasOne(Prueba::class, 'id_postulante');
+}
+
 
     public function ultimaPrueba()
 {

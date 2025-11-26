@@ -27,10 +27,12 @@ class Evaluacion extends Model
     ];
 
 
-    public function prueba()
+// En el modelo Prueba.php
+public function evaluacion()
 {
-    return $this->belongsTo(Prueba::class, 'id_prueba', 'id_prueba');
+    return $this->hasOne(Evaluacion::class, 'id_prueba');
 }
+
 
 
 }

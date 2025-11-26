@@ -7,92 +7,78 @@ use App\Models\Evaluacion;
 use App\Models\Prueba;
 use Illuminate\Http\Request;
 use Mpdf\Mpdf;
+use Illuminate\Support\Facades\Log;
 class RegistradorController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, $id_postulante = null)
 {
-    // Verificamos que haya sesión
+    // Obtener el registrador (usuario)
     $registradorId = session('id_usu');
-
-    if (!$registradorId) {
-        return redirect('/inicio')->with('error', 'Debes iniciar sesión.');
-    }
-
-    // Usuario que está logueado
     $registrador = Usuario::findOrFail($registradorId);
+    
 
-    // Consulta base
-    $query = Postulante::query();
+    // Obtener postulantes atendidos y no atendidos
+    $postulantesAtendidos = Postulante::whereHas('pruebas', function($query) {
+        $query->whereNotNull('nota_total')->whereNotNull('ruta_pdf');
+    })->get();
 
-    // === Filtros ===
-    if ($ci = $request->input('ci')) {
-        $query->where('ci', 'like', "%{$ci}%");
+    $postulantesNoAtendidos = Postulante::whereDoesntHave('pruebas', function($query) {
+        $query->whereNotNull('nota_total')->whereNotNull('ruta_pdf');
+    })->get();
+
+    // Obtener id_prueba para un postulante específico, si se pasa el id_postulante
+    $id_prueba = null;
+    if ($id_postulante) {
+        $postulante = Postulante::find($id_postulante);
+        if ($postulante && $postulante->prueba) {
+            $id_prueba = $postulante->prueba->id_prueba;  // Obtener id_prueba relacionado
+        }
     }
 
-    if ($apPat = $request->input('apellido_paterno')) {
-        $query->where('apellido_paterno', 'like', "%{$apPat}%");
-    }
-
-    if ($apMat = $request->input('apellido_materno')) {
-        $query->where('apellido_materno', 'like', "%{$apMat}%");
-    }
-
-    if ($inst = $request->input('instituto')) {
-        $query->where('instituto', $inst);
-    }
-
-    // === ORDEN ===
-    $query->orderBy('apellido_paterno')
-          ->orderBy('apellido_materno')
-          ->orderBy('nombres');
-
-    // ======================================================
-    //  🔵 POSTULANTES NO ATENDIDOS:
-    //     - Sin pruebas
-    //     - Con evaluación incompleta (cualquier null)
-    // ======================================================
-
-    $postulantesNoAtendidos = (clone $query)
-        ->where(function($q){
-
-            // 1. Sin pruebas
-            $q->whereDoesntHave('pruebas');
-
-            // 2. O con evaluación incompleta
-            $q->orWhereHas('evaluacion', function($ev){
-                $ev->whereNull('velocidad')
-                   ->orWhereNull('prueba_resis')
-                   ->orWhereNull('barra')
-                   ->orWhereNull('cap_abdominal')
-                   ->orWhereNull('flexiones')
-                   ->orWhereNull('natacion');
-            });
-
-        })
-        ->get();
-
-    // ======================================================
-    //  🟢 POSTULANTES ATENDIDOS:
-    //     - Evaluación COMPLETA (ningún campo null)
-    // ======================================================
-
-    $postulantesAtendidos = (clone $query)
-        ->whereHas('evaluacion', function($ev){
-            $ev->whereNotNull('velocidad')
-               ->whereNotNull('prueba_resis')
-               ->whereNotNull('barra')
-               ->whereNotNull('cap_abdominal')
-               ->whereNotNull('flexiones')
-               ->whereNotNull('natacion');
-        })
-        ->get();
-
+    // Pasamos los datos a la vista
     return view('dash_registrador', compact(
-        'registrador',
-        'postulantesAtendidos',
-        'postulantesNoAtendidos'
+        'registrador', 
+        'postulantesAtendidos', 
+        'postulantesNoAtendidos', 
+        'id_prueba'
     ));
 }
+
+public function aplicarFiltros(Request $request)
+{
+    // Realizamos la consulta para obtener los postulantes filtrados
+    $query = Postulante::query();
+
+    // Aplicar los filtros
+    if ($request->filled('ci')) {
+        $query->where('ci', 'like', "%{$request->ci}%");
+    }
+
+    if ($request->filled('apellido_paterno')) {
+        $query->where('apellido_paterno', 'like', "%{$request->apellido_paterno}%");
+    }
+
+    if ($request->filled('apellido_materno')) {
+        $query->where('apellido_materno', 'like', "%{$request->apellido_materno}%");
+    }
+
+    if ($request->filled('instituto')) {
+        $query->where('instituto', $request->instituto);
+    }
+
+    // Obtener los postulantes atendidos y no atendidos
+    $postulantesAtendidos = $query->whereHas('pruebas', function ($query) {
+        $query->whereNotNull('nota_total')->whereNotNull('ruta_pdf');
+    })->get();
+
+    $postulantesNoAtendidos = $query->whereDoesntHave('pruebas', function ($query) {
+        $query->whereNotNull('nota_total')->whereNotNull('ruta_pdf');
+    })->get();
+
+    // Retornar la vista parcial con los postulantes filtrados
+    return view('partials.postulantes', compact('postulantesAtendidos', 'postulantesNoAtendidos'));
+}
+
 
 
     // ==========================
@@ -145,13 +131,6 @@ class RegistradorController extends Controller
     // Devolver el valor como un número decimal
     return (float) $normalizado;
 }
-
-
-    /**
-     * Calcula el puntaje de velocidad según sexo y tiempo.
-     * $sexo: 0 = varón, 1 = mujer.
-     * $tiempoCrudo: string que viene del formulario (ej. "11''50").
-     */
     public function calcularPuntajeVelocidad(int $sexo, string $tiempoCrudo): int
     {
         $tiempo = $this->normalizarTiempo($tiempoCrudo);
@@ -193,11 +172,6 @@ class RegistradorController extends Controller
         }
     }
 
-/**
- * Calcula el puntaje de PRUEBA DE RESISTENCIA según sexo y tiempo.
- * $sexo: 0 = varón, 1 = mujer.
- * $tiempoCrudo: string que viene del formulario (ej. "12''15").
- */
 public function calcularPuntajeResistencia(int $sexo, string $tiempoCrudo): int
 {
     $tiempo = $this->normalizarTiempo($tiempoCrudo);
@@ -236,11 +210,6 @@ public function calcularPuntajeResistencia(int $sexo, string $tiempoCrudo): int
         return 0;                      // 13''31 en adelante
     }
 }
-/**
- * Calcula el puntaje de FLEXIONES EN BARRA según sexo y repeticiones.
- * $sexo: 0 = varón, 1 = mujer.
- * $repeticiones: número de repeticiones realizadas.
- */
 public function calcularPuntajeBarra(int $sexo, int $repeticiones): int
 {
     if ($sexo === 0) {
@@ -269,11 +238,6 @@ public function calcularPuntajeBarra(int $sexo, int $repeticiones): int
         return 0;  // Menos de 1 repetición
     }
 }
-/**
- * Calcula el puntaje de NATACIÓN según sexo y tiempo.
- * $sexo: 0 = varón, 1 = mujer.
- * $tiempo: tiempo en segundos (por ejemplo: 95 para 1 minuto 35 segundos).
- */
 public function calcularPuntajeNatacion(int $sexo, float $tiempo): int
 {
     if ($sexo === 0) {
@@ -304,11 +268,6 @@ public function calcularPuntajeNatacion(int $sexo, float $tiempo): int
         return 0;
     }
 }
-/**
- * Calcula el puntaje de CAPACIDAD ABDOMINAL según sexo y repeticiones.
- * $sexo: 0 = varón, 1 = mujer.
- * $repeticiones: número de repeticiones realizadas.
- */
 public function calcularPuntajeAbdominales(int $sexo, int $repeticiones): int
 {
     if ($sexo === 0) {
@@ -338,11 +297,6 @@ public function calcularPuntajeAbdominales(int $sexo, int $repeticiones): int
         return 0;  // Menos de 5 repeticiones
     }
 }
-/**
- * Calcula el puntaje de FLEXIONES EN SUELO según sexo y repeticiones.
- * $sexo: 0 = varón, 1 = mujer.
- * $repeticiones: número de repeticiones realizadas.
- */
 public function calcularPuntajeFlexiones(int $sexo, int $repeticiones): int
 {
     if ($sexo === 0) {
@@ -373,160 +327,6 @@ public function calcularPuntajeFlexiones(int $sexo, int $repeticiones): int
         return 0;  // Menos de 5 repeticiones
     }
 }
-public function guardarEvaluacion(Request $request, $id_postulante)
-{
-    $postulante = Postulante::findOrFail($id_postulante);
-
-    // Normalizar los tiempos antes de guardar
-    $tiempoVelocidad = $this->normalizarTiempo($request->velocidad);
-    $tiempoResistencia = $this->normalizarTiempo($request->prueba_resis);
-    $tiempoNatacion = $this->normalizarTiempo($request->natacion);
-
-    // Cálculos de notas
-    $notaVelocidad = $this->calcularPuntajeVelocidad($postulante->sexo, $tiempoVelocidad);
-    $notaResistencia = $this->calcularPuntajeResistencia($postulante->sexo, $tiempoResistencia);
-    $notaBarra = $this->calcularPuntajeBarra($postulante->sexo, $request->barra);
-    $notaNatacion = $this->calcularPuntajeNatacion($postulante->sexo, $tiempoNatacion);
-    $notaAbdominales = $this->calcularPuntajeAbdominales($postulante->sexo, $request->cap_abdominal);
-    $notaFlexiones = $this->calcularPuntajeFlexiones($postulante->sexo, $request->flexiones);
-
-    // Guardamos PRUEBA
-    $prueba = new Prueba();
-    $prueba->id_postulante = $postulante->id_postulante;
-    $prueba->observacion = $request->observacion;
-    $prueba->nota_total = null;
-    $prueba->conclusion = null;
-    $prueba->ruta_pdf = '';
-    $prueba->save();
-
-    // Guardamos EVALUACION
-    $evaluacion = new Evaluacion();
-    $evaluacion->id_prueba = $prueba->id_prueba;
-    $evaluacion->velocidad = $tiempoVelocidad;
-    $evaluacion->nota_velocidad = $notaVelocidad;
-    $evaluacion->prueba_resis = $tiempoResistencia;
-    $evaluacion->nota_prueba = $notaResistencia;
-    $evaluacion->barra = $request->barra;
-    $evaluacion->nota_barra = $notaBarra;
-    $evaluacion->natacion = $tiempoNatacion;
-    $evaluacion->nota_natacion = $notaNatacion;
-    $evaluacion->cap_abdominal = $request->cap_abdominal;
-    $evaluacion->nota_cap = $notaAbdominales;
-    $evaluacion->flexiones = $request->flexiones;
-    $evaluacion->nota_flexiones = $notaFlexiones;
-    $evaluacion->save();
-
-    // Nota total y conclusión
-    $notas = [
-        $notaVelocidad, $notaResistencia, $notaBarra, $notaNatacion,
-        $notaAbdominales, $notaFlexiones
-    ];
-
-    $promedio = array_sum($notas) / count($notas);
-    $algunMenor51 = false;
-foreach ($notas as $nota) {
-    if ($nota < 51) {
-        $algunMenor51 = true;
-        break;
-    }
-}
-
-// Determinar conclusión
-if ($algunMenor51 || $promedio < 51) {
-    $conclusion = 'REPROBADO';
-} else {
-    $conclusion = 'APROBADO';
-}
-
-    $prueba->nota_total = $promedio;
-    $prueba->conclusion = $conclusion;
-    $prueba->save();
-
-    // ===============================
-    //  OBTENER EVALUADOR (LOGUEADO)
-    // ===============================
-    $evaluadorId = session('id_usu');
-    $evaluador = Usuario::find($evaluadorId);
-
-    // ===============================
-    //   GENERAR Y GUARDAR EL PDF
-    // ===============================
-    $mpdf = new \Mpdf\Mpdf([
-        'tempDir' => '/var/www/html/tmp/mpdf'
-    ]);
-
-    // Pasamos TODOS los datos incluyendo el evaluador
-    $html = view('pdf_evaluacion', [
-    'postulante'  => $postulante,
-    'prueba'      => $prueba,
-    'evaluacion'  => $evaluacion,
-    'evaluador'   => $evaluador,
-    'debug'       => $evaluador ? 'SI TIENE' : 'NO TIENE'
-])->render();
-
-
-    $mpdf->WriteHTML($html);
-
-    // Nombre del archivo
-    $pdfFileName = 'evaluacion_postulante_' . $postulante->id_postulante . '_' . time() . '.pdf';
-
-    // Ruta donde se guardará
-    $savePath = storage_path('app/pdfs/' . $pdfFileName);
-
-    // Guardarlo en disco
-    $mpdf->Output($savePath, \Mpdf\Output\Destination::FILE);
-
-    // Guardar la ruta en BD
-    $prueba->ruta_pdf = 'pdfs/' . $pdfFileName;
-    $prueba->save();
-
-    return redirect()
-        ->route('dash.registrador')
-        ->with('success', 'Evaluación guardada y PDF generado correctamente.');
-}
-
-
-public function testPDF()
-{
-    // Directorio donde se guardará el PDF
-    $storagePath = storage_path('app/pdfs');
-
-    // Asegúrate de que la carpeta 'pdfs' exista, si no, crea la carpeta
-    if (!file_exists($storagePath)) {
-        mkdir($storagePath, 0777, true); // Crear la carpeta si no existe
-    }
-
-    // Directorio temporal donde mPDF guardará los archivos temporales
-    $tempDir = storage_path('mpdf_temp');
-
-    // Asegúrate de que la carpeta temporal también exista
-    if (!file_exists($tempDir)) {
-        mkdir($tempDir, 0777, true); // Crear la carpeta si no existe
-    }
-
-    // Crear una nueva instancia de mPDF y pasar el directorio temporal
-    $mpdf = new Mpdf([
-        'tempDir' => $tempDir // Establecemos el directorio temporal para mPDF
-    ]);
-
-    // Cargar la vista Blade como HTML
-    $html = view('pdf_evaluacion', ['message' => 'Generando PDF de prueba'])->render();
-
-    // Escribir el HTML en el documento
-    $mpdf->WriteHTML($html);
-
-    // Guardar el archivo PDF en la carpeta especificada
-    $pdfFileName = 'evaluacion_postulante_' . uniqid() . '.pdf';
-    $pdfFilePath = $storagePath . '/' . $pdfFileName;
-    $mpdf->Output($pdfFilePath, 'F'); // 'F' guarda el archivo en el servidor
-
-    // Retornar la ruta del archivo guardado
-    return response()->json([
-        'message' => 'PDF generado y guardado exitosamente.',
-        'pdf_file' => $pdfFilePath
-    ]);
-}
-
 
 public function verPDF($fileName)
 {
@@ -697,77 +497,49 @@ public function actualizar(Request $request, $id_prueba)
         return redirect()->route('dash.registrador')->with('success', 'Evaluación actualizada correctamente.');
     }
 
-public function guardarVelocidad(Request $request, $id)
+public function guardarVelocidad(Request $request, $id_postulante)
 {
-    $postulante = Postulante::findOrFail($id);
+    $request->validate([
+        'velocidad' => 'required'
+    ]);
 
+    $postulante = Postulante::findOrFail($id_postulante);
+
+    // Obtener PRUEBA + EVALUACION, creando si es necesario
+    [$prueba, $eva] = $this->obtenerPruebaYEvaluacion($id_postulante);
+
+    // Calcular nota
     $tiempo = $this->normalizarTiempo($request->velocidad);
     $nota = $this->calcularPuntajeVelocidad($postulante->sexo, $tiempo);
 
-    // Crear PRUEBA si no existe
-    $prueba = Prueba::firstOrCreate(['id_postulante' => $id]);
-
-    $eva = Evaluacion::firstOrNew(['id_prueba' => $prueba->id_prueba]);
-
+    // Guardar
     $eva->velocidad = $tiempo;
     $eva->nota_velocidad = $nota;
     $eva->save();
 
-    return back()->with('success', 'Velocidad registrada. Ahora complete resistencia.');
+    return back()->with('success', 'Velocidad registrada.');
 }
 
-public function guardarResistencia(Request $request, $id)
+public function guardarResistencia(Request $request, $id_postulante)
 {
-    $postulante = Postulante::findOrFail($id);
+    $request->validate([
+        'prueba_resis' => 'required'
+    ]);
 
-    // Buscar la prueba ya creada en velocidad
-    $prueba = Prueba::where('id_postulante', $id)->latest()->first();
+    $postulante = Postulante::findOrFail($id_postulante);
 
-    if (!$prueba) {
-        return back()->with('error', 'Primero debe registrar Velocidad.');
-    }
+    [$prueba, $eva] = $this->obtenerPruebaYEvaluacion($id_postulante);
 
-    // Buscar evaluación ya iniciada
-    $eva = Evaluacion::firstOrNew(['id_prueba' => $prueba->id_prueba]);
-
-    // Calcular nota
     $tiempo = $this->normalizarTiempo($request->prueba_resis);
-    $nota  = $this->calcularPuntajeResistencia($postulante->sexo, $tiempo);
+    $nota = $this->calcularPuntajeResistencia($postulante->sexo, $tiempo);
 
-    // Guardar
     $eva->prueba_resis = $tiempo;
     $eva->nota_prueba = $nota;
     $eva->save();
 
-    return back()->with('success', 'Resistencia registrada. Ahora complete barra.');
+    return back()->with('success', 'Resistencia registrada.');
 }
 
-public function apiEvaluacion($id)
-{
-    $postulante = Postulante::findOrFail($id);
-
-    $prueba = Prueba::where('id_postulante', $id)->first();
-    if (!$prueba) {
-        return response()->json([
-            'velocidad' => null,
-            'nota_velocidad' => null,
-            'prueba_resis' => null,
-            'nota_prueba' => null,
-            'barra' => null,
-            'nota_barra' => null,
-            'cap_abdominal' => null,
-            'nota_cap' => null,
-            'flexiones' => null,
-            'nota_flexiones' => null,
-            'natacion' => null,
-            'nota_natacion' => null,
-        ]);
-    }
-
-    $eva = Evaluacion::where('id_prueba', $prueba->id_prueba)->first();
-
-    return response()->json($eva);
-}
 public function guardarBarra(Request $request, $id_postulante)
 {
     $request->validate([
@@ -776,112 +548,67 @@ public function guardarBarra(Request $request, $id_postulante)
 
     $postulante = Postulante::findOrFail($id_postulante);
 
-    // Obtener la prueba ya creada
-    $prueba = Prueba::where('id_postulante', $id_postulante)
-        ->latest('id_prueba')
-        ->first();
+    [$prueba, $eva] = $this->obtenerPruebaYEvaluacion($id_postulante);
 
-    if (!$prueba) {
-        return back()->with('error', 'Primero registre velocidad.');
-    }
-
-    // Obtener evaluación en proceso
-    $eva = Evaluacion::where('id_prueba', $prueba->id_prueba)->first();
-
-    if (!$eva) {
-        return back()->with('error', 'Debe registrar velocidad y resistencia antes.');
-    }
-
-    // GUARDAR BARRA
-    $eva->barra = $request->barra;
-
-    // USAR TU FUNCIÓN REAL
     $nota = $this->calcularPuntajeBarra($postulante->sexo, $request->barra);
-    $eva->nota_barra = $nota;
 
+    $eva->barra = $request->barra;
+    $eva->nota_barra = $nota;
     $eva->save();
 
-    return back()->with('success', 'Barra registrada. Ahora complete abdominales.');
+    return back()->with('success', 'Barra registrada.');
 }
+
 
 public function guardarNatacion(Request $request, $id_postulante)
 {
-    // Validar entrada
     $request->validate([
         'natacion' => 'required'
     ]);
 
-    // Obtener postulante
     $postulante = Postulante::findOrFail($id_postulante);
 
-    // Verificar que ya exista una prueba previa
-    $prueba = Prueba::where('id_postulante', $id_postulante)
-        ->latest('id_prueba')
-        ->first();
-
-    if (!$prueba) {
-        return back()->with('error', 'Primero registre velocidad.');
-    }
-
-    // Obtener evaluación ya iniciada
-    $eva = Evaluacion::where('id_prueba', $prueba->id_prueba)->first();
-    if (!$eva || is_null($eva->barra)) {
-        return back()->with('error', 'Debe registrar velocidad, resistencia y barra antes.');
-    }
+    // Obtener o crear prueba + evaluación
+    [$prueba, $eva] = $this->obtenerPruebaYEvaluacion($id_postulante);
 
     // Normalizar tiempo
     $tiempo = $this->normalizarTiempo($request->natacion);
 
-    // Calcular nota REAL usando tu función
+    // Calcular nota correcta
     $nota = $this->calcularPuntajeNatacion($postulante->sexo, $tiempo);
 
-    // Guardar en BD
+    // Guardar
     $eva->natacion = $tiempo;
     $eva->nota_natacion = $nota;
     $eva->save();
 
     return redirect()
         ->route('dash.registrador')
-        ->with('success', 'Natación registrada correctamente. Ahora complete abdominales.');
+        ->with('success', 'Natación registrada correctamente.');
 }
 
 public function guardarAbdominal(Request $request, $id_postulante)
 {
-    // Validar dato
     $request->validate([
         'cap_abdominal' => 'required|numeric|min:0'
     ]);
 
-    // Obtener postulante
     $postulante = Postulante::findOrFail($id_postulante);
 
-    // Obtener la última prueba
-    $prueba = Prueba::where('id_postulante', $id_postulante)
-        ->latest('id_prueba')
-        ->first();
+    // Obtener o crear prueba + evaluación
+    [$prueba, $eva] = $this->obtenerPruebaYEvaluacion($id_postulante);
 
-    if (!$prueba) {
-        return back()->with('error', 'Primero registre velocidad.');
-    }
-
-    // Obtener evaluación
-    $eva = Evaluacion::where('id_prueba', $prueba->id_prueba)->first();
-
-    if (!$eva || is_null($eva->natacion)) {
-        return back()->with('error', 'Debe registrar velocidad, resistencia, barra y natación antes.');
-    }
-
-    // Calcular nota verdadera con tu fórmula
+    // Calcular nota
     $nota = $this->calcularPuntajeAbdominales($postulante->sexo, $request->cap_abdominal);
 
-    // Guardar datos
+    // Guardar
     $eva->cap_abdominal = $request->cap_abdominal;
     $eva->nota_cap = $nota;
     $eva->save();
 
     return redirect()
         ->route('dash.registrador')
-        ->with('success', 'Abdominales registrados. Ahora complete flexiones.');
+        ->with('success', 'Abdominales registrados correctamente.');
 }
 
 public function guardarFlexiones(Request $request, $id_postulante)
@@ -892,130 +619,257 @@ public function guardarFlexiones(Request $request, $id_postulante)
 
     $postulante = Postulante::findOrFail($id_postulante);
 
-    // Obtener prueba existente
-    $prueba = Prueba::where('id_postulante', $id_postulante)
-        ->latest()
-        ->first();
-
-    if (!$prueba) {
-        return back()->with('error', 'Debe registrar velocidad primero.');
-    }
-
-    // Obtener evaluación existente
-    $eva = Evaluacion::where('id_prueba', $prueba->id_prueba)->first();
-
-    if (!$eva || is_null($eva->cap_abdominal)) {
-        return back()->with('error', 'Debe completar todas las pruebas antes de flexiones.');
-    }
+    // Obtener o crear prueba + evaluación
+    [$prueba, $eva] = $this->obtenerPruebaYEvaluacion($id_postulante);
 
     // Calcular nota real
     $notaFlex = $this->calcularPuntajeFlexiones($postulante->sexo, $request->flexiones);
 
-    // Guardar
+    // Guardar datos
     $eva->flexiones = $request->flexiones;
     $eva->nota_flexiones = $notaFlex;
     $eva->save();
 
-    // ================================
-    //   CALCULAR PROMEDIO FINAL
-    // ================================
-    $notas = [
-        $eva->nota_velocidad,
-        $eva->nota_prueba,
-        $eva->nota_barra,
-        $eva->nota_natacion,
-        $eva->nota_cap,
-        $eva->nota_flexiones,
-    ];
-
-    $promedio = array_sum($notas) / 6;
-
-    // 👌 Si TODAS son >= 51 → aprobado
-    // ❌ Si alguna es < 51 → reprobado
-    $minima = min($notas);
-    $conclusion = ($minima >= 51) ? 'APROBADO' : 'REPROBADO';
-
-    // ================================
-    //   ENVIAR DATOS AL MODAL FINAL
-    // ================================
-    return redirect()->back()->with([
-        'final_id'        => $id_postulante,
-        'final_promedio'  => round($promedio, 2),
-        'final_conclusion'=> $conclusion
-    ]);
+    return redirect()
+        ->route('dash.registrador')
+        ->with('success', 'Flexiones registradas correctamente.');
 }
 
-public function finalizarEvaluacion(Request $request, $id_postulante)
+public function obtenerEvaluacion($id_postulante)
 {
-    $request->validate([
-        'observacion' => 'required|string|max:500'
-    ]);
-
+    // Obtener la última prueba del postulante
     $postulante = Postulante::findOrFail($id_postulante);
+    $ultimaPrueba = $postulante->pruebas()->latest()->first();
 
-    // Obtener PRUEBA (ya creada durante velocidad)
-    $prueba = Prueba::where('id_postulante', $id_postulante)
-        ->latest()
-        ->firstOrFail();
+    if (!$ultimaPrueba) {
+        return response()->json(['error' => 'No hay evaluación disponible para este postulante'], 404);
+    }
 
-    // Obtener EVALUACION ya completada
-    $eva = Evaluacion::where('id_prueba', $prueba->id_prueba)->firstOrFail();
-
-    // Recalcular promedio final
+    // Calcular el promedio de las notas
     $notas = [
-        $eva->nota_velocidad,
-        $eva->nota_prueba,
-        $eva->nota_barra,
-        $eva->nota_natacion,
-        $eva->nota_cap,
-        $eva->nota_flexiones,
+        $ultimaPrueba->nota_velocidad,
+        $ultimaPrueba->nota_prueba,
+        $ultimaPrueba->nota_barra,
+        $ultimaPrueba->nota_natacion,
+        $ultimaPrueba->nota_cap,
+        $ultimaPrueba->nota_flexiones
     ];
 
-    $prom = array_sum($notas) / 6;
-    $minima = min($notas);
-    $conclusion = ($minima >= 51) ? 'APROBADO' : 'REPROBADO';
+    $promedio = array_sum($notas) / count($notas);
+    $conclusion = $promedio >= 51 ? 'APROBADO' : 'REPROBADO';
 
-    // Guardar resumen final
-    $prueba->nota_total = $prom;
-    $prueba->conclusion = $conclusion;
-    $prueba->observacion = $request->observacion;
-    $prueba->save();
+    // Retornar los datos en formato JSON
+    return response()->json([
+        'promedio' => $promedio,
+        'conclusion' => $conclusion,
+        'id_postulante' => $postulante->id_postulante,
+        'nota_total' => $ultimaPrueba->nota_total,
+        'evaluacion' => $ultimaPrueba
+    ]);
+}
+// En el controlador RegistradorController
+// En RegistradorController
+public function obtenerIdPrueba($id_postulante)
+{
+    // Buscar el postulante
+    $postulante = Postulante::find($id_postulante);
 
-    // ===============================
-    //  OBTENER EVALUADOR (LOGUEADO)
-    // ===============================
+    if (!$postulante) {
+        return response()->json(['error' => 'Postulante no encontrado'], 404);
+    }
+
+    // Obtener el id_prueba relacionado con el postulante
+    $prueba = $postulante->prueba; // Esto obtiene la prueba asociada al postulante
+
+    if ($prueba) {
+        $id_prueba = $prueba->id_prueba;
+        $evaluacion = $prueba->evaluacion;  // Obtener la evaluación asociada a esta prueba
+    } else {
+        $id_prueba = null;
+        $evaluacion = null;
+    }
+
+    // Calcular el promedio y la conclusión
+    $promedio = null;
+    $conclusion = null;
+
+    if ($evaluacion) {
+        // Obtener las notas de la evaluación
+        $notas = [
+            $evaluacion->nota_velocidad,
+            $evaluacion->nota_prueba,
+            $evaluacion->nota_barra,
+            $evaluacion->nota_cap,
+            $evaluacion->nota_flexiones,
+            $evaluacion->nota_natacion,
+        ];
+
+        // Filtrar las notas no nulas
+        $notas_validas = array_filter($notas, function ($nota) {
+            return $nota !== null;
+        });
+
+        // Calcular el promedio
+        if (count($notas_validas) > 0) {
+            $promedio = array_sum($notas_validas) / count($notas_validas);
+        }
+
+        // Determinar la conclusión
+        if (min($notas_validas) < 51) {
+            $conclusion = 'Reprobado';
+        } else {
+            $conclusion = 'Aprobado';
+        }
+    }
+
+    return response()->json([
+        'id_postulante' => $postulante->id_postulante,
+        'id_prueba' => $id_prueba,
+        'evaluacion' => $evaluacion,
+        'promedio' => $promedio,
+        'conclusion' => $conclusion,
+    ]);
+}
+public function actualizarPrueba(Request $request, $id_postulante)
+{
+    try {
+        // Validamos que los datos enviados estén presentes
+        $request->validate([
+            'nota_total' => 'required|numeric',
+            'conclusion' => 'required|string',
+            'observacion' => 'nullable|string',
+        ]);
+
+        // Buscar el postulante
+        $postulante = Postulante::findOrFail($id_postulante);
+
+        // Obtener la prueba relacionada con el postulante
+        $prueba = $postulante->prueba;
+
+        if (!$prueba) {
+            return response()->json(['error' => 'Prueba no encontrada'], 404);
+        }
+
+        // Actualizamos la prueba con los datos nuevos
+        $prueba->nota_total = $request->input('nota_total');
+        $prueba->conclusion = $request->input('conclusion');
+        $prueba->observacion = $request->input('observacion');
+
+        // Guardar los cambios
+        $prueba->save();
+
+        // Llamar a la función para generar el PDF después de guardar
+        $this->generarPDF($id_postulante);
+
+        return response()->json([
+            'message' => 'Prueba actualizada correctamente',
+            'prueba' => $prueba,
+        ]);
+
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json(['error' => 'Postulante o prueba no encontrada', 'message' => $e->getMessage()], 404);
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'Error interno del servidor', 'message' => $e->getMessage()], 500);
+    }
+}
+private function obtenerPruebaYEvaluacion($id_postulante) { 
+    // Buscar prueba existente 
+    $prueba = Prueba::where('id_postulante', $id_postulante) ->latest('id_prueba') ->first(); 
+    if (!$prueba) { // → Primera prueba → crear PRUEBA y EVALUACION vacía 
+    $prueba = Prueba::create([ 'id_postulante' => $id_postulante, 'observacion' => null, 'nota_total' => null, 'conclusion' => null, 'ruta_pdf' => '' ]); 
+    $evaluacion = Evaluacion::create([ 'id_prueba' => $prueba->id_prueba ]); } else { // → Ya existe evaluación
+    $evaluacion = Evaluacion::firstOrCreate([ 'id_prueba' => $prueba->id_prueba ]); } return [$prueba, $evaluacion]; 
+}
+public function generarPDF($id_postulante)
+{
+    // Obtener el postulante y la prueba
+    $postulante = Postulante::findOrFail($id_postulante);
+    $prueba = $postulante->prueba;
+
+    // Obtener la evaluación relacionada
+    $evaluacion = $postulante->evaluacion;
+
+    // Asegúrate de tener el evaluador
     $evaluadorId = session('id_usu');
     $evaluador = Usuario::find($evaluadorId);
 
-    // ===============================
-    //   GENERAR Y GUARDAR EL PDF
-    // ===============================
-    $mpdf = new \Mpdf\Mpdf([
-        'tempDir' => '/var/www/html/tmp/mpdf'
+    // Crear el PDF usando DomPDF (o Mpdf si prefieres)
+    $mpdf = new Mpdf([
+        'tempDir' => '/var/www/html/tmp/mpdf'// Dirección temporal para el archivo mPDF
     ]);
 
-    $html = view('pdf_evaluacion', [
-        'postulante'  => $postulante,
-        'prueba'      => $prueba,
-        'evaluacion'  => $eva,
-        'evaluador'   => $evaluador,
-    ])->render();
+    // Generar el HTML con la vista 'pdf_evaluacion'
+    $html = view('pdf_evaluacion', compact(
+        'postulante',
+        'prueba',
+        'evaluacion',
+        'evaluador'
+    ))->render();
 
+    // Escribir el contenido HTML en el archivo PDF
     $mpdf->WriteHTML($html);
 
-    // Nombre del archivo
-    $fileName = 'evaluacion_postulante_' . $postulante->id_postulante . '_' . time() . '.pdf';
-    $savePath = storage_path('app/pdfs/' . $fileName);
+    // Nombre del archivo PDF
+    $pdfName = 'evaluacion_postulante_' . $postulante->id_postulante . '_' . time() . '.pdf';
 
-    // Guardar PDF en disco
+    // Ruta donde se guardará el PDF en storage
+    $savePath = storage_path('app/pdfs/' . $pdfName);
+
+    // Guardar el PDF en el sistema de archivos
     $mpdf->Output($savePath, \Mpdf\Output\Destination::FILE);
 
-    // Guardar ruta pdf en BD
-    $prueba->ruta_pdf = 'pdfs/' . $fileName;
+    // Guardar la ruta del archivo PDF en la columna 'ruta_pdf' de la tabla 'prueba'
+    $prueba->ruta_pdf = 'pdfs/' . $pdfName;
     $prueba->save();
 
-    return redirect()->route('dash.registrador')
-        ->with('success', 'Evaluación finalizada y PDF generado correctamente.');
+    // Devolver la respuesta
+    return response()->json([
+        'message' => 'PDF generado y guardado correctamente.',
+        'ruta_pdf' => 'pdfs/' . $pdfName
+    ]);
+}
+
+// En tu controlador RegistradorController
+public function filtrarPostulantes(Request $request)
+{
+    // Filtros recibidos
+    $query = Postulante::query();
+
+    // Filtrar por CI
+    if ($request->filled('ci')) {
+        $query->where('ci', 'like', "%" . $request->ci . "%");
+    }
+
+    // Filtrar por apellido paterno
+    if ($request->filled('apellido_paterno')) {
+        $query->where('apellido_paterno', 'like', "%" . $request->apellido_paterno . "%");
+    }
+
+    // Filtrar por apellido materno
+    if ($request->filled('apellido_materno')) {
+        $query->where('apellido_materno', 'like', "%" . $request->apellido_materno . "%");
+    }
+
+    // Filtrar por instituto
+    if ($request->filled('instituto')) {
+        $query->where('instituto', $request->instituto);
+    }
+
+    // Obtener postulantes NO atendidos
+    $postulantesNoAtendidos = $query->whereDoesntHave('pruebas', function($query) {
+        $query->whereNotNull('nota_total')->whereNotNull('ruta_pdf');
+    })->get();
+
+    // Obtener postulantes ATENDIDOS
+    $postulantesAtendidos = $query->whereHas('pruebas', function($query) {
+        $query->whereNotNull('nota_total')->whereNotNull('ruta_pdf');
+    })->get();
+
+    // Retornar los datos en formato JSON para actualizar la tabla sin recargar
+    return response()->json([
+        'postulantesNoAtendidos' => $postulantesNoAtendidos,
+        'postulantesAtendidos' => $postulantesAtendidos,
+    ]);
 }
 
 }

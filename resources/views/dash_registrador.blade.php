@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Panel Registrador - Sistema de Examen Físico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         :root {
             --celeste: #00bcd4;
@@ -340,238 +340,192 @@
             {{ session('error') }}
         </div>
     @endif
-
-    {{-- Filtros (afectan ambas tablas) --}}
-    <section class="filters-card">
-        <div class="filters-title">Filtros de búsqueda (aplican a atendidos y no atendidos)</div>
-        <form method="GET" action="{{ route('dash.registrador') }}">
-            <div class="filters-grid">
-                <div>
-                    <label for="ci">CI</label>
-                    <input type="text" id="ci" name="ci" value="{{ request('ci') }}">
-                </div>
-                <div>
-                    <label for="apellido_paterno">Apellido paterno</label>
-                    <input type="text" id="apellido_paterno" name="apellido_paterno" value="{{ request('apellido_paterno') }}">
-                </div>
-                <div>
-                    <label for="apellido_materno">Apellido materno</label>
-                    <input type="text" id="apellido_materno" name="apellido_materno" value="{{ request('apellido_materno') }}">
-                </div>
-                <div>
-                    <label for="instituto">Instituto</label>
-                    <select id="instituto" name="instituto">
-                        <option value="">Todos</option>
-                        <option value="1" {{ request('instituto') == '1' ? 'selected' : '' }}>COLMILAV</option>
-                        <option value="2" {{ request('instituto') == '2' ? 'selected' : '' }}>POLMILAE</option>
-                        <option value="3" {{ request('instituto') == '3' ? 'selected' : '' }}>EMMFAB</option>
-                    </select>
-                </div>
+<section class="filters-card">
+    <div class="filters-title">Filtros de búsqueda (aplican a atendidos y no atendidos)</div>
+    <form id="filtersForm" method="GET" action="{{ route('dash.registrador') }}" onsubmit="applyFilters(event)">
+        <div class="filters-grid">
+            <div>
+                <label for="ci">CI</label>
+                <input type="text" id="ci" name="ci" value="{{ request('ci') }}">
             </div>
-
-            <div class="filters-actions">
-                <button type="submit" class="btn btn-primary">Aplicar filtros</button>
-                <a href="{{ route('dash.registrador') }}" class="btn btn-secondary">Limpiar</a>
+            <div>
+                <label for="apellido_paterno">Apellido paterno</label>
+                <input type="text" id="apellido_paterno" name="apellido_paterno" value="{{ request('apellido_paterno') }}">
             </div>
-        </form>
-    </section>
-
-
-    {{-- Dos columnas: No atendidos / Atendidos --}}
-    <main>
-        {{-- Postulantes NO atendidos --}}
-<section class="card">
-    <div class="card-header">
-        <div class="card-title">Postulantes no atendidos</div>
-        <div class="card-subtitle">
-            Total: {{ $postulantesNoAtendidos->count() }}
+            <div>
+                <label for="apellido_materno">Apellido materno</label>
+                <input type="text" id="apellido_materno" name="apellido_materno" value="{{ request('apellido_materno') }}">
+            </div>
+            <div>
+                <label for="instituto">Instituto</label>
+                <select id="instituto" name="instituto">
+                    <option value="">Todos</option>
+                    <option value="1" {{ request('instituto') == '1' ? 'selected' : '' }}>COLMILAV</option>
+                    <option value="2" {{ request('instituto') == '2' ? 'selected' : '' }}>POLMILAE</option>
+                    <option value="3" {{ request('instituto') == '3' ? 'selected' : '' }}>EMMFAB</option>
+                </select>
+            </div>
         </div>
-    </div>
 
-    @if($postulantesNoAtendidos->isEmpty())
-        <p class="empty-msg">No hay postulantes pendientes con los filtros actuales.</p>
-    @else
-        <table>
-            <thead>
-            <tr>
-                <th>#</th>
-                <th>CI</th>
-                <th>Apellidos</th>
-                <th>Nombres</th>
-                <th>Instituto</th>
-                <th>Acciones</th> {{-- 👈 NUEVA COLUMNA --}}
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($postulantesNoAtendidos as $index => $p)
-                @php
-                    $inst = match($p->instituto) {
-                        1 => 'COLMILAV',
-                        2 => 'POLMILAE',
-                        3 => 'EMMFAB',
-                        default => 'N/D',
-                    };
-                @endphp
-                <tr>
-                    <td>{{ $index + 1 }}</td>
-                    <td>{{ $p->ci }}</td>
-                    <td>{{ $p->apellido_paterno }} {{ $p->apellido_materno }}</td>
-                    <td>{{ $p->nombres }}</td>
-                    <td><span class="badge-inst">{{ $inst }}</span></td>
-                    <td>
-
-@php
-    // última evaluación del postulante (si existe)
-    $eva = $p->evaluacion;
-@endphp
-@if(!$eva)
-    <button onclick="abrirVelocidad({{ $p->id_postulante }})" class="btn btn-primary">Velocidad</button>
-
-@elseif(is_null($eva->prueba_resis))
-    <button onclick="abrirResistencia({{ $p->id_postulante }})" class="btn btn-primary">Resistencia</button>
-
-@elseif(is_null($eva->barra))
-    <button onclick="abrirBarra({{ $p->id_postulante }})" class="btn btn-primary">Barra</button>
-
-@elseif(is_null($eva->natacion))
-    <button onclick="abrirNatacion({{ $p->id_postulante }})" class="btn btn-primary">Natación</button>
-
-@elseif(is_null($eva->cap_abdominal))
-    <button onclick="abrirAbdominal({{ $p->id_postulante }})" class="btn btn-primary">Abdominales</button>
-
-@elseif(is_null($eva->flexiones))
-    <button onclick="abrirFlexiones({{ $p->id_postulante }})" class="btn btn-primary">Flexiones</button>
-
-@else
-    <span>Completado</span>
-@endif
-
-</td>
-
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
-    @endif
+        <div class="filters-actions">
+            <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+            <a href="{{ route('dash.registrador') }}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
 </section>
 
 
-        {{-- Postulantes ATENDIDOS --}}
-        <section class="card">
-            <div class="card-header">
-                <div class="card-title">Postulantes atendidos</div>
-                <div class="card-subtitle">
-                    Total: {{ $postulantesAtendidos->count() }}
-                </div>
-            </div>
 
-            @if($postulantesAtendidos->isEmpty())
-                <p class="empty-msg">No hay postulantes atendidos con los filtros actuales.</p>
-            @else
-                <table>
-                    <thead>
-<tr>
-    <th>#</th>
-    <th>CI</th>
-    <th>Apellidos</th>
-    <th>Nombres</th>
-    <th>Instituto</th>
-    <th>Acciones</th> {{-- NUEVA COLUMNA --}}
-</tr>
-</thead>
-<tbody>
-@foreach($postulantesAtendidos as $index => $p)
+    {{-- Dos columnas: No atendidos / Atendidos --}}
+    <main id="postulantes-container">
+    {{-- Postulantes NO atendidos --}}
+    <section class="card">
+        <div class="card-header">
+            <div class="card-title">Postulantes no atendidos</div>
+            <div class="card-subtitle">
+                Total: <span id="noAtendidosCount">{{ $postulantesNoAtendidos->count() }}</span>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>CI</th>
+                    <th>Apellidos</th>
+                    <th>Nombres</th>
+                    <th>Instituto</th>
+                    <th>Acciones</th> {{-- 👈 NUEVA COLUMNA --}}
+                </tr>
+            </thead>
+            <tbody id="noAtendidosTable">
+                {{-- Aquí se llenará dinámicamente con los postulantes filtrados --}}
+                @foreach($postulantesNoAtendidos as $index => $p)
+                    <tr>
+                        <td>{{ $index + 1 }}</td>
+                        <td>{{ $p->ci }}</td>
+                        <td>{{ $p->apellido_paterno }} {{ $p->apellido_materno }}</td>
+                        <td>{{ $p->nombres }}</td>
+                        <td><span class="badge-inst">
     @php
-        $inst = match($p->instituto) {
+        $instituto = match($p->instituto) {
             1 => 'COLMILAV',
             2 => 'POLMILAE',
             3 => 'EMMFAB',
-            default => 'N/D',
+            default => 'N/D', // En caso de que el instituto no coincida con ninguno de los anteriores
         };
-
-        // Obtener su última prueba (que tiene ruta_pdf)
-        $ultima = $p->pruebas()->latest()->first();
     @endphp
-    <tr>
-        <td>{{ $index + 1 }}</td>
-        <td>{{ $p->ci }}</td>
-        <td>{{ $p->apellido_paterno }} {{ $p->apellido_materno }}</td>
-        <td>{{ $p->nombres }}</td>
-        <td><span class="badge-inst">{{ $inst }}</span></td>
+    {{ $instituto }}
+</span></td>
 
-        <td>
-            @if($ultima && $ultima->ruta_pdf)
-                <a href="{{ route('pdf.ver', basename($ultima->ruta_pdf)) }}"
-                   class="btn btn-secondary" 
-                   style="padding: 0.25rem 0.8rem; font-size: 0.78rem;">
-                    Ver PDF
-                </a>
+                        <td>
+                            <button class="btn btn-primary" onclick="abrirMenuEvaluacion({{ $p->id_postulante }})">Llenar evaluación</button>
+                            <button class="btn btn-success" onclick="finalizarEvaluacion({{ $p->id_postulante }})">Finalizar</button>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </section>
 
-                <a href="{{ route('pdf.descargar', basename($ultima->ruta_pdf)) }}"
-                   class="btn btn-primary"
-                   style="padding: 0.25rem 0.8rem; font-size: 0.78rem;">
-                    Descargar
-                </a>
+    {{-- Postulantes ATENDIDOS --}}
+    <section class="card">
+        <div class="card-header">
+            <div class="card-title">Postulantes atendidos</div>
+            <div class="card-subtitle">
+                Total: <span id="atendidosCount">{{ $postulantesAtendidos->count() }}</span>
+            </div>
+        </div>
 
-                <a href="{{ route('postulante.editar', $ultima->id_prueba) }}"
-   class="btn btn-secondary"
-   style="padding:0.25rem 0.7rem; font-size:0.78rem;">
-    Editar
-</a>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>CI</th>
+                    <th>Apellidos</th>
+                    <th>Nombres</th>
+                    <th>Instituto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="atendidosTable">
+                {{-- Aquí se llenará dinámicamente con los postulantes atendidos filtrados --}}
+                @foreach($postulantesAtendidos as $index => $p)
+                    <tr>
+                        <td>{{ $index + 1 }}</td>
+                        <td>{{ $p->ci }}</td>
+                        <td>{{ $p->apellido_paterno }} {{ $p->apellido_materno }}</td>
+                        <td>{{ $p->nombres }}</td>
+                        <td><span class="badge-inst">
+    @php
+        $instituto = match($p->instituto) {
+            1 => 'COLMILAV',
+            2 => 'POLMILAE',
+            3 => 'EMMFAB',
+            default => 'N/D', // En caso de que el instituto no coincida con ninguno de los anteriores
+        };
+    @endphp
+    {{ $instituto }}
+</span></td>
 
-            @else
-                <span style="font-size: 0.75rem; color: #777;">Sin PDF</span>
-            @endif
-        </td>
-    </tr>
-@endforeach
-</tbody>
+                        <td>
+                            @if($p->pruebas()->latest()->first())
+                                <a href="{{ route('pdf.ver', basename($p->pruebas()->latest()->first()->ruta_pdf)) }}" class="btn btn-secondary">Ver PDF</a>
+                                <a href="{{ route('pdf.descargar', basename($p->pruebas()->latest()->first()->ruta_pdf)) }}" class="btn btn-primary">Descargar</a>
+                            @else
+                                <span style="font-size: 0.75rem; color: #777;">Sin PDF</span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </section>
+</main>
 
-                </table>
-            @endif
-        </section>
-    </main>
 
 </div>
-<div id="modalVelocidad" 
+<div id="modalVelocidad"
      style="display:none; position:fixed; inset:0; background:#0008;
-            justify-content:center; align-items:center; z-index:9999;">
-    
+            justify-content:center; align-items:center; z-index:99999;">
     <div style="background:white; padding:1.5rem; border-radius:10px; width:330px;">
         <h3 style="margin-bottom:1rem;">Registrar Velocidad</h3>
 
+        <p><b>Valor actual:</b> <span id="velocidad_actual">—</span></p>
+        <p><b>Nota actual:</b> <span id="nota_velocidad_actual">—</span></p>
+
         <form id="formVelocidad" method="POST" action="">
             @csrf
-
             <label style="font-size:0.85rem;">Tiempo</label>
-            <input type="text" name="velocidad" 
-                   style="width:100%; margin-top:0.3rem; padding:0.4rem;
-                          border:1px solid #ccc; border-radius:7px;" required>
+            <input type="text" name="velocidad"
+                style="width:100%; margin-top:0.3rem; padding:0.4rem;
+                       border:1px solid #ccc; border-radius:7px;" required>
 
-            <button type="submit"
-                    class="btn btn-primary"
+            <button type="submit" class="btn btn-primary"
                     style="margin-top:1rem; width:100%;">
                 Guardar
             </button>
         </form>
 
-        <button onclick="cerrarVelocidad()"
-                class="btn btn-secondary"
+        <button onclick="cerrarVelocidad()" class="btn btn-secondary"
                 style="margin-top:0.7rem; width:100%;">
             Cancelar
         </button>
     </div>
+
 </div>
-{{-- ===== MODAL RESISTENCIA ===== --}}
-<div id="modalResistencia" 
+
+<div id="modalResistencia"
      style="display:none; position:fixed; inset:0; background:#0008;
-            justify-content:center; align-items:center; z-index:9999;">
+            justify-content:center; align-items:center; z-index:99999;">
+
 
     <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
         <h3 style="margin-bottom:1rem;">Registrar Resistencia</h3>
 
-        <p><b>Velocidad:</b> <span id="res_velocidad"></span></p>
-        <p><b>Nota velocidad:</b> <span id="res_nota_velocidad"></span></p>
+        <p><b>Valor actual:</b> <span id="res_valor">—</span></p>
+        <p><b>Nota actual:</b> <span id="res_nota">—</span></p>
+
 
         <form id="formResistencia" method="POST" action="">
             @csrf
@@ -598,27 +552,19 @@
 
 
 {{-- ===== MODAL BARRA ===== --}}
-<div id="modalBarra" 
+<div id="modalBarra"
      style="display:none; position:fixed; inset:0; background:#0008;
-            justify-content:center; align-items:center; z-index:9999;">
-
+            justify-content:center; align-items:center; z-index:99999;">
     <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
         <h3 style="margin-bottom:1rem;">Registrar Barra (sin tiempo)</h3>
-
-        <p><b>Velocidad:</b> <span id="bar_velocidad"></span></p>
-        <p><b>Nota velocidad:</b> <span id="bar_nota_velocidad"></span></p>
-
-        <p><b>Resistencia:</b> <span id="bar_res"></span></p>
-        <p><b>Nota resistencia:</b> <span id="bar_nota_res"></span></p>
-
+        <p><b>Valor actual:</b> <span id="barra_valor">—</span></p>
+        <p><b>Nota actual:</b> <span id="barra_nota">—</span></p>
         <form id="formBarra" method="POST" action="">
             @csrf
-
             <label style="font-size:0.85rem;">N° Repeticiones</label>
             <input type="number" name="barra"
                    style="width:100%; margin-top:0.3rem; padding:0.4rem;
                           border:1px solid #ccc; border-radius:7px;" required>
-
             <button type="submit"
                     class="btn btn-primary"
                     style="margin-top:1rem; width:100%;">
@@ -635,25 +581,15 @@
 </div>
 
 {{-- ===== MODAL ABDOMINALES ===== --}}
-<div id="modalAbdominal" 
+<div id="modalAbdominal"
      style="display:none; position:fixed; inset:0; background:#0008;
-            justify-content:center; align-items:center; z-index:9999;">
+            justify-content:center; align-items:center; z-index:99999;">
+
 
     <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
         <h3 style="margin-bottom:1rem;">Registrar Abdominales</h3>
-
-        <p><b>Velocidad:</b> <span id="abd_velocidad"></span></p>
-        <p><b>Nota velocidad:</b> <span id="abd_nota_velocidad"></span></p>
-
-        <p><b>Resistencia:</b> <span id="abd_res"></span></p>
-        <p><b>Nota resistencia:</b> <span id="abd_nota_res"></span></p>
-
-        <p><b>Barra:</b> <span id="abd_barra"></span></p>
-        <p><b>Nota barra:</b> <span id="abd_nota_barra"></span></p>
-
-        <p><b>Natación:</b> <span id="abd_nat"></span></p>
-        <p><b>Nota natación:</b> <span id="abd_nota_nat"></span></p>
-
+        <p><b>Valor actual:</b> <span id="abd_valor">—</span></p>
+        <p><b>Nota actual:</b> <span id="abd_nota">—</span></p>
         <form id="formAbdominal" method="POST" action="">
             @csrf
 
@@ -679,22 +615,15 @@
 
 
 {{-- ===== MODAL NATACIÓN ===== --}}
-<div id="modalNatacion" 
+<div id="modalNatacion"
      style="display:none; position:fixed; inset:0; background:#0008;
-            justify-content:center; align-items:center; z-index:9999;">
+            justify-content:center; align-items:center; z-index:99999;">
+
 
     <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
         <h3 style="margin-bottom:1rem;">Registrar Natación</h3>
-
-        <p><b>Velocidad:</b> <span id="nat_velocidad"></span></p>
-        <p><b>Nota velocidad:</b> <span id="nat_nota_velocidad"></span></p>
-
-        <p><b>Resistencia:</b> <span id="nat_res"></span></p>
-        <p><b>Nota resistencia:</b> <span id="nat_nota_res"></span></p>
-
-        <p><b>Barra:</b> <span id="nat_barra"></span></p>
-        <p><b>Nota barra:</b> <span id="nat_nota_barra"></span></p>
-
+        <p><b>Valor actual:</b> <span id="nat_valor">—</span></p>
+        <p><b>Nota actual:</b> <span id="nat_nota">—</span></p>
         <form id="formNatacion" method="POST" action="">
             @csrf
 
@@ -718,27 +647,16 @@
     </div>
 </div>
 {{-- ===== MODAL FLEXIONES ===== --}}
-<div id="modalFlexiones" 
+<div id="modalFlexiones"
      style="display:none; position:fixed; inset:0; background:#0008;
-            justify-content:center; align-items:center; z-index:9999;">
+            justify-content:center; align-items:center; z-index:99999;">
+
     
     <div style="background:white; padding:1.5rem; border-radius:10px; width:360px;">
         <h3 style="margin-bottom:1rem;">Registrar Flexiones</h3>
 
-        <p><b>Velocidad:</b> <span id="flex_velocidad"></span></p>
-        <p><b>Nota velocidad:</b> <span id="flex_nota_velocidad"></span></p>
-
-        <p><b>Resistencia:</b> <span id="flex_res"></span></p>
-        <p><b>Nota resistencia:</b> <span id="flex_nota_res"></span></p>
-
-        <p><b>Barra:</b> <span id="flex_barra"></span></p>
-        <p><b>Nota barra:</b> <span id="flex_nota_barra"></span></p>
-
-        <p><b>Natación:</b> <span id="flex_nat"></span></p>
-        <p><b>Nota natación:</b> <span id="flex_nota_nat"></span></p>
-
-        <p><b>Abdominales:</b> <span id="flex_abd"></span></p>
-        <p><b>Nota abdominales:</b> <span id="flex_nota_abd"></span></p>
+        <p><b>Valor actual:</b> <span id="flex_valor">—</span></p>
+        <p><b>Nota actual:</b> <span id="flex_nota">—</span></p>
 
         <form id="formFlexiones" method="POST" action="">
             @csrf
@@ -757,55 +675,215 @@
                 style="margin-top:0.7rem; width:100%;">Cancelar</button>
     </div>
 </div>
-{{-- ===== MODAL FINAL ===== --}}
-<div id="modalFinal" 
-     style="display:none; position:fixed; inset:0; background:#0009;
-            justify-content:center; align-items:center; z-index:99999;">
-    
-    <div style="background:white; padding:1.5rem; border-radius:12px; width:380px;">
-        <h3 style="margin-bottom:1rem;">Resultados Finales</h3>
+{{-- ===== MODAL MENÚ DE EVALUACIÓN ===== --}}
+<!-- Modal Menu de Evaluación -->
+<div id="modalMenuEval" 
+     style="display:none; position:fixed; inset:0; background:#0008;
+            justify-content:center; align-items:center; z-index:9000;">
+    <div style="background:white; padding:1.5rem; border-radius:12px; width:360px;">
+        <h3 style="margin-bottom:1rem;">Evaluación Física</h3>
 
-        <p><b>Promedio Total:</b> <span id="final_promedio"></span></p>
-        <p><b>Conclusión:</b> <span id="final_conclusion"></span></p>
+        <!-- Aquí se coloca el nombre del postulante que puede ser dinámico -->
+        <p><b>Postulante:</b> <span id="menu_nombre"></span></p>
 
-        <form id="formFinal" method="POST" action="">
-            @csrf
-
-            <label style="font-size:0.85rem;">Observación</label>
-            <textarea name="observacion" rows="3"
-                      style="width:100%; margin-top:0.3rem; padding:0.5rem;
-                             border:1px solid #ccc; border-radius:7px;" required></textarea>
-
-            <button type="submit" class="btn btn-primary"
-                    style="margin-top:1rem; width:100%;">Guardar Evaluación</button>
-        </form>
-
-        <button onclick="cerrarFinal()"
+        <div id="menu_botones"></div>
+        <button onclick="cerrarMenuEval()"
                 class="btn btn-secondary"
-                style="margin-top:0.7rem; width:100%;">Cancelar</button>
+                style="margin-top:0.5rem; width:100%;">Cerrar</button>
     </div>
 </div>
+<!-- Modal Finalizar Evaluación -->
+<div id="modalFinalizar" 
+     style="display:none; position:fixed; inset:0; background:#0008; 
+            justify-content:center; align-items:center; z-index:99999;">
+    <div style="background:white; padding:1.5rem; border-radius:10px; width:350px;">
+        <h3 style="margin-bottom:1rem;">Finalizar Evaluación</h3>
 
-@if(session('final_id'))
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    abrirFinal(
-        "{{ session('final_id') }}",
-        "{{ session('final_promedio') }}",
-        "{{ session('final_conclusion') }}"
-    );
-});
-</script>
-@endif
+        <p><b>ID Postulante:</b> <span id="finalizar_id_postulante">—</span></p>
+        <p><b>ID Prueba:</b> <span id="finalizar_id_prueba">—</span></p>
+        
+        <!-- Mostrar Promedio -->
+        <p><b>Promedio:</b> <span id="finalizar_promedio">—</span></p>
+
+        <!-- Mostrar Conclusión -->
+        <p><b>Conclusión:</b> <span id="finalizar_conclusion">—</span></p>
+
+        <!-- Nuevo Campo de Observación -->
+        <p><b>Observación:</b></p>
+        <textarea id="finalizar_observacion" style="width:100%; height:80px;"></textarea>
+
+        <!-- Botón Guardar -->
+        <button onclick="guardarEvaluacion()" class="btn btn-primary" 
+                style="margin-top:1rem; width:100%;">Guardar</button>
+
+        <button onclick="cerrarFinalizar()" class="btn btn-secondary" 
+                style="margin-top:0.7rem; width:100%;">Cerrar</button>
+    </div>
+</div>
 
 
 </body>
 </html>
+
 <script>
-function abrirVelocidad(id) {
-    document.getElementById("modalVelocidad").style.display = "flex";
-    document.getElementById("formVelocidad").action = "/postulantes/" + id + "/velocidad";
+    function guardarEvaluacion() {
+    const id_postulante = document.getElementById("finalizar_id_postulante").innerText;
+    const nota_total = document.getElementById("finalizar_promedio").innerText;  // Cambiar 'nota_final' por 'nota_total'
+    const conclusion = document.getElementById("finalizar_conclusion").innerText;
+    const observacion = document.getElementById("finalizar_observacion").value;
+
+    // Validar que todos los datos estén disponibles
+    if (!id_postulante || !nota_total || !conclusion) {
+        alert("Por favor complete todos los campos.");
+        return;
+    }
+
+    // Obtener el token CSRF desde la metaetiqueta
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    // Actualizar la prueba en la base de datos
+    fetch(`/actualizar-prueba/${id_postulante}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken // Incluir el token CSRF
+        },
+        body: JSON.stringify({
+            nota_total: nota_total,  // Cambiar 'nota_final' por 'nota_total'
+            conclusion: conclusion,
+            observacion: observacion,
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert("Error: " + data.error);
+        } else {
+            alert("Prueba actualizada correctamente");
+
+            // Llamar a la función para generar el PDF después de actualizar la prueba
+            generarPDF(id_postulante);
+            cerrarFinalizar();  // Cerrar el modal después de guardar
+        }
+    })
+    .catch(error => {
+        console.error("Error al guardar los datos:", error);
+        alert("Hubo un error al guardar los datos.");
+    });
 }
+
+function generarPDF(id_postulante) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    // Llamar a la ruta para generar el PDF
+    fetch(`/generar-pdf/${id_postulante}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken // Incluir el token CSRF
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert(data.message);  // Mostrar mensaje de éxito
+        } else {
+            alert("Error al generar el PDF");
+        }
+    })
+    .catch(error => {
+        console.error("Error al generar el PDF:", error);
+        alert("Hubo un error al generar el PDF.");
+    });
+}
+
+
+// Función para abrir el modal de Finalizar y obtener el id_prueba
+function finalizarEvaluacion(id_postulante) {
+    fetch("/obtener-id-prueba/" + id_postulante)
+        .then(r => r.json())
+        .then(data => {
+            // Mostrar el modal
+            document.getElementById("modalFinalizar").style.display = "flex";
+            document.getElementById("finalizar_id_postulante").innerText = data.id_postulante;
+            document.getElementById("finalizar_id_prueba").innerText = data.id_prueba ?? "No asignado";
+
+            // Mostrar el promedio
+            document.getElementById("finalizar_promedio").innerText = data.promedio !== null ? data.promedio.toFixed(2) : "—";
+
+            // Mostrar la conclusión
+            document.getElementById("finalizar_conclusion").innerText = data.conclusion ?? "—";
+        })
+        .catch(error => {
+            console.error("Error al obtener los datos:", error);
+        });
+}
+
+
+// Función para cerrar el modal de Finalizar
+function cerrarFinalizar() {
+    document.getElementById("modalFinalizar").style.display = "none";
+}
+
+
+function abrirMenuEvaluacion(id) {
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+            let html = "";
+
+            const pruebas = [
+                { campo: "velocidad",         label: "Velocidad",     modal: "abrirVelocidad" },
+                { campo: "prueba_resis",      label: "Resistencia",   modal: "abrirResistencia" },
+                { campo: "barra",             label: "Barras",        modal: "abrirBarra" },
+                { campo: "natacion",          label: "Natación",      modal: "abrirNatacion" },
+                { campo: "cap_abdominal",     label: "Abdominales",   modal: "abrirAbdominal" },
+                { campo: "flexiones",         label: "Flexiones",     modal: "abrirFlexiones" },
+            ];
+
+            let completas = 0;
+
+            pruebas.forEach(p => {
+                let lleno = data[p.campo] !== null && data[p.campo] !== "";
+
+                if (lleno) completas++;
+
+                html += `
+                    <button class="btn ${lleno ? 'btn-success' : 'btn-primary'}"
+                            style="width:100%; margin-bottom:6px;"
+                            onclick="${p.modal}(${id})">
+                        ${p.label} ${lleno ? '✔' : ''}
+                    </button>
+                `;
+            });
+
+            document.getElementById("menu_botones").innerHTML = html;
+
+            document.getElementById("modalMenuEval").style.display = "flex";  // Mostrar el modal
+        });
+}
+</script>
+
+<script>
+function abrirVelocidad(id){
+
+    fetch("/api/evaluacion/" + id)
+        .then(r => r.json())
+        .then(data => {
+
+            document.getElementById("velocidad_actual").innerText =
+                data.velocidad ?? "—";
+
+            document.getElementById("nota_velocidad_actual").innerText =
+                data.nota_velocidad ?? "—";
+
+            document.querySelector("#formVelocidad input[name='velocidad']")
+                .value = data.velocidad ?? "";
+        });
+    // Mostrar modal
+    document.getElementById("modalVelocidad").style.display="flex";
+    document.getElementById("formVelocidad").action="/postulantes/"+id+"/velocidad";
+}
+
 
 function cerrarVelocidad() {
     document.getElementById("modalVelocidad").style.display = "none";
@@ -813,30 +891,31 @@ function cerrarVelocidad() {
 </script>
 <script>
 
-function abrirVelocidad(id){
-    document.getElementById("modalVelocidad").style.display="flex";
-    document.getElementById("formVelocidad").action="/postulantes/"+id+"/velocidad";
-}
-
-function cerrarVelocidad(){
-    document.getElementById("modalVelocidad").style.display="none";
-}
-
-
-
 // ===== RESISTENCIA =====
 function abrirResistencia(id){
 
     fetch("/api/evaluacion/" + id)
         .then(r => r.json())
         .then(data => {
-            document.getElementById("res_velocidad").innerText = data.velocidad;
-            document.getElementById("res_nota_velocidad").innerText = data.nota_velocidad;
+
+            document.getElementById("res_valor").innerText =
+                data.prueba_resis ?? "—";
+
+            document.getElementById("res_nota").innerText =
+                data.nota_prueba ?? "—";
+
+            document.querySelector("#formResistencia input[name='prueba_resis']")
+                .value = data.prueba_resis ?? "";
         });
 
     document.getElementById("modalResistencia").style.display="flex";
-    document.getElementById("formResistencia").action = "/postulantes/"+id+"/resistencia";
+    document.getElementById("formResistencia").action="/postulantes/"+id+"/resistencia";
 }
+
+function cerrarResistencia(){
+    document.getElementById("modalResistencia").style.display="none";
+}
+
 
 function cerrarResistencia(){
     document.getElementById("modalResistencia").style.display="none";
@@ -850,72 +929,53 @@ function abrirBarra(id){
     fetch("/api/evaluacion/" + id)
         .then(r => r.json())
         .then(data => {
-            document.getElementById("bar_velocidad").innerText = data.velocidad;
-            document.getElementById("bar_nota_velocidad").innerText = data.nota_velocidad;
 
-            document.getElementById("bar_res").innerText = data.prueba_resis;
-            document.getElementById("bar_nota_res").innerText = data.nota_prueba;
+            document.getElementById("barra_valor").innerText =
+                data.barra ?? "—";
+
+            document.getElementById("barra_nota").innerText =
+                data.nota_barra ?? "—";
+
+            document.querySelector("#formBarra input[name='barra']")
+                .value = data.barra ?? "";
         });
 
     document.getElementById("modalBarra").style.display="flex";
-    document.getElementById("formBarra").action = "/postulantes/"+id+"/barra";
+    document.getElementById("formBarra").action="/postulantes/"+id+"/barra";
 }
 
 function cerrarBarra(){
     document.getElementById("modalBarra").style.display="none";
 }
+
 function abrirAbdominal(id){
 
     fetch("/api/evaluacion/" + id)
         .then(r => r.json())
         .then(data => {
 
-            document.getElementById("abd_velocidad").innerText = data.velocidad;
-            document.getElementById("abd_nota_velocidad").innerText = data.nota_velocidad;
+            document.getElementById("abd_valor").innerText =
+                data.cap_abdominal ?? "—";
 
-            document.getElementById("abd_res").innerText = data.prueba_resis;
-            document.getElementById("abd_nota_res").innerText = data.nota_prueba;
+            document.getElementById("abd_nota").innerText =
+                data.nota_cap ?? "—";
 
-            document.getElementById("abd_barra").innerText = data.barra;
-            document.getElementById("abd_nota_barra").innerText = data.nota_barra;
-
-            document.getElementById("abd_nat").innerText = data.natacion;
-            document.getElementById("abd_nota_nat").innerText = data.nota_natacion;
+            document.querySelector("#formAbdominal input[name='cap_abdominal']")
+                .value = data.cap_abdominal ?? "";
         });
 
-    document.getElementById("modalAbdominal").style.display = "flex";
-    document.getElementById("formAbdominal").action = "/postulantes/" + id + "/abdominal";
+    document.getElementById("modalAbdominal").style.display="flex";
+    document.getElementById("formAbdominal").action="/postulantes/"+id+"/abdominal";
 }
 
 function cerrarAbdominal(){
-    document.getElementById("modalAbdominal").style.display = "none";
+    document.getElementById("modalAbdominal").style.display="none";
 }
 
-function abrirFlexiones(id){
-
-    fetch("/api/evaluacion/" + id)
-        .then(r => r.json())
-        .then(data => {
-
-            document.getElementById("flex_velocidad").innerText = data.velocidad;
-            document.getElementById("flex_nota_velocidad").innerText = data.nota_velocidad;
-
-            document.getElementById("flex_res").innerText = data.prueba_resis;
-            document.getElementById("flex_nota_res").innerText = data.nota_prueba;
-
-            document.getElementById("flex_barra").innerText = data.barra;
-            document.getElementById("flex_nota_barra").innerText = data.nota_barra;
-
-            document.getElementById("flex_nat").innerText = data.natacion;
-            document.getElementById("flex_nota_nat").innerText = data.nota_natacion;
-
-            document.getElementById("flex_abd").innerText = data.cap_abdominal;
-            document.getElementById("flex_nota_abd").innerText = data.nota_cap;
-        });
-
-    document.getElementById("modalFlexiones").style.display = "flex";
-    document.getElementById("formFlexiones").action = "/postulantes/" + id + "/flexiones";
+function cerrarMenuEval(){
+    document.getElementById("modalMenuEval").style.display="none";
 }
+function abrirFlexiones(id){ fetch("/api/evaluacion/" + id) .then(r => r.json()) .then(data => { document.getElementById("flex_valor").innerText = data.flexiones ?? "—"; document.getElementById("flex_nota").innerText = data.nota_flexiones ?? "—"; document.querySelector("#formFlexiones input[name='flexiones']") .value = data.flexiones ?? ""; }); document.getElementById("modalFlexiones").style.display="flex"; document.getElementById("formFlexiones").action="/postulantes/"+id+"/flexiones"; }
 
 function cerrarFlexiones(){
     document.getElementById("modalFlexiones").style.display = "none";
@@ -929,35 +989,110 @@ function abrirNatacion(id){
     fetch("/api/evaluacion/" + id)
         .then(r => r.json())
         .then(data => {
-            document.getElementById("nat_velocidad").innerText = data.velocidad;
-            document.getElementById("nat_nota_velocidad").innerText = data.nota_velocidad;
 
-            document.getElementById("nat_res").innerText = data.prueba_resis;
-            document.getElementById("nat_nota_res").innerText = data.nota_prueba;
+            document.getElementById("nat_valor").innerText =
+                data.natacion ?? "—";
 
-            document.getElementById("nat_barra").innerText = data.barra;
-            document.getElementById("nat_nota_barra").innerText = data.nota_barra;
+            document.getElementById("nat_nota").innerText =
+                data.nota_natacion ?? "—";
+
+            document.querySelector("#formNatacion input[name='natacion']")
+                .value = data.natacion ?? "";
         });
 
-    document.getElementById("modalNatacion").style.display = "flex";
-    document.getElementById("formNatacion").action = "/postulantes/" + id + "/natacion";
+    document.getElementById("modalNatacion").style.display="flex";
+    document.getElementById("formNatacion").action="/postulantes/"+id+"/natacion";
 }
 
 function cerrarNatacion(){
-    document.getElementById("modalNatacion").style.display = "none";
+    document.getElementById("modalNatacion").style.display="none";
 }
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Función que aplica los filtros
+    function applyFilters(event) {
+        event.preventDefault();  // Evitar el envío normal del formulario
 
-function abrirFinal(id, promedio, conclusion){
-    document.getElementById("final_promedio").innerText = promedio;
-    document.getElementById("final_conclusion").innerText = conclusion;
+        const form = document.getElementById('filtersForm');
+        const formData = new FormData(form);
 
-    document.getElementById("modalFinal").style.display = "flex";
-    document.getElementById("formFinal").action = "/postulantes/" + id + "/finalizar";
-}
+        // Convertir los datos del formulario en parámetros de consulta
+        const queryString = new URLSearchParams(formData).toString();
 
+        // Usar Fetch API para enviar los filtros al backend sin recargar la página
+        fetch(`/filtrar-postulantes?${queryString}`, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())  // Recibimos los postulantes filtrados en formato JSON
+        .then(data => {
+            // Actualizamos las tablas de postulantes NO atendidos
+            const postulantesNoAtendidosTable = document.getElementById('noAtendidosTable');
+            const postulantesAtendidosTable = document.getElementById('atendidosTable');
 
-function cerrarFinal(){
-    document.getElementById("modalFinal").style.display = "none";
-}
+            // Limpiar el contenido de las tablas
+            postulantesNoAtendidosTable.innerHTML = '';
+            postulantesAtendidosTable.innerHTML = '';
+
+            // Si no hay postulantes, mostramos un mensaje
+            if (data.postulantesNoAtendidos.length === 0) {
+                postulantesNoAtendidosTable.innerHTML = '<tr><td colspan="6">No se encontraron postulantes pendientes con los filtros aplicados.</td></tr>';
+            } else {
+                data.postulantesNoAtendidos.forEach((p, index) => {
+                    const inst = p.instituto == 1 ? 'COLMILAV' : p.instituto == 2 ? 'POLMILAE' : p.instituto == 3 ? 'EMMFAB' : 'N/D';
+                    postulantesNoAtendidosTable.innerHTML += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${p.ci}</td>
+                            <td>${p.apellido_paterno} ${p.apellido_materno}</td>
+                            <td>${p.nombres}</td>
+                            <td><span class="badge-inst">${inst}</span></td>
+                            <td>
+                                <button class="btn btn-primary" onclick="abrirMenuEvaluacion(${p.id_postulante})">Llenar evaluación</button>
+                                <button class="btn btn-success" onclick="finalizarEvaluacion(${p.id_postulante})">Finalizar</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // Si no hay postulantes atendidos, mostramos un mensaje
+            if (data.postulantesAtendidos.length === 0) {
+                postulantesAtendidosTable.innerHTML = '<tr><td colspan="6">No se encontraron postulantes atendidos con los filtros aplicados.</td></tr>';
+            } else {
+                data.postulantesAtendidos.forEach((p, index) => {
+                    const inst = p.instituto == 1 ? 'COLMILAV' : p.instituto == 2 ? 'POLMILAE' : p.instituto == 3 ? 'EMMFAB' : 'N/D';
+                    const ultima = p.pruebas.length > 0 ? p.pruebas[0] : null;
+                    postulantesAtendidosTable.innerHTML += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${p.ci}</td>
+                            <td>${p.apellido_paterno} ${p.apellido_materno}</td>
+                            <td>${p.nombres}</td>
+                            <td><span class="badge-inst">${inst}</span></td>
+                            <td>
+                                ${ultima && ultima.ruta_pdf ? ` 
+                                    <a href="/pdf/ver/${basename(ultima.ruta_pdf)}" class="btn btn-secondary">Ver PDF</a>
+                                    <a href="/pdf/descargar/${basename(ultima.ruta_pdf)}" class="btn btn-primary">Descargar</a>
+                                    <a href="/postulante/editar/${ultima.id_prueba}" class="btn btn-secondary">Editar</a>
+                                ` : '<span style="font-size: 0.75rem; color: #777;">Sin PDF</span>'}
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error al aplicar filtros:', error);
+        });
+    }
+
+    // Adjuntar el evento de filtro
+    const filterForm = document.getElementById('filtersForm');
+    filterForm.addEventListener('submit', applyFilters);
+});
 
 </script>
